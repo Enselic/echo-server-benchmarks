@@ -2,8 +2,7 @@
 //
 // Usage:
 //   go run tcp_echo_stress.go 200
-//
-// Edit addr below to point at your echo server.
+//   go run tcp_echo_stress.go 127.0.0.1:9001 200
 
 package main
 
@@ -15,18 +14,23 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		os.Stderr.WriteString("usage: tcp_echo_stress <clients>\n")
+	if len(os.Args) != 2 && len(os.Args) != 3 {
+		os.Stderr.WriteString("usage: tcp_echo_stress [addr] <clients>\n")
 		os.Exit(2)
 	}
 
-	n, err := strconv.Atoi(os.Args[1])
+	addr := "192.168.0.104:9001"
+	clientsArg := os.Args[1]
+	if len(os.Args) == 3 {
+		addr = os.Args[1]
+		clientsArg = os.Args[2]
+	}
+
+	n, err := strconv.Atoi(clientsArg)
 	if err != nil || n <= 0 {
 		os.Stderr.WriteString("clients must be a positive integer\n")
 		os.Exit(2)
 	}
-
-	addr := "192.168.0.104:9001" // <-- change me
 
 	payload := []byte("pingpingpingpingpingpingpingping") // any bytes are fine
 	reply := make([]byte, len(payload))
