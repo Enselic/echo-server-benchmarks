@@ -34,7 +34,7 @@ func main() {
 	}
 	defer ln.Close()
 
-	log.Println("TCP echo server listening on :9002")
+	log.Println("Go TCP echo server listening on :9002")
 
 	for {
 		conn, err := ln.Accept()
