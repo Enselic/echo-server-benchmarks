@@ -4,7 +4,7 @@ set -o errexit -o nounset -o pipefail
 mkdir -p build
 
 # Build and deploy Go version
-go build -o build/go-tcp-echo-server go/main.go
+go build -o build/go-tcp-echo-server go-server/main.go
 scp build/go-tcp-echo-server martin@192.168.0.104:/tmp/go-tcp-echo-server
 
 # Build and deploy Rust tokio version
