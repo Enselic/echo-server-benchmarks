@@ -11,3 +11,7 @@ scp build/go-tcp-echo-server martin@192.168.0.104:/tmp/go-tcp-echo-server
 cargo build --manifest-path rust/Cargo.toml --release
 cp rust/target/release/rust-tcp-echo-server build/
 scp build/rust-tcp-echo-server martin@192.168.0.104:/tmp/rust-tcp-echo-server
+
+# Run both servers on the remote machine
+ssh martin@192.168.0.104 /tmp/rust-tcp-echo-server &
+ssh martin@192.168.0.104 /tmp/go-tcp-echo-server
