@@ -3,8 +3,14 @@ use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("0.0.0.0:9001").await?;
-    println!("TCP echo server listening on :9001");
+    let port = std::env::args().nth(1).unwrap_or_else(|| {
+        eprintln!("usage: rust-tcp-echo-server <port>");
+        std::process::exit(2);
+    });
+
+    let bind_addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&bind_addr).await?;
+    println!("TCP echo server listening on {}", bind_addr);
 
     loop {
         let (mut socket, _addr) = listener.accept().await?;

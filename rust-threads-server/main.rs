@@ -3,8 +3,14 @@ use std::net::TcpListener;
 use std::thread;
 
 fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("0.0.0.0:9001")?;
-    println!("TCP echo server listening on :9001");
+    let port = std::env::args().nth(1).unwrap_or_else(|| {
+        eprintln!("usage: rust-threads-tcp-echo-server <port>");
+        std::process::exit(2);
+    });
+
+    let bind_addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&bind_addr)?;
+    println!("TCP echo server listening on {}", bind_addr);
 
     for stream_result in listener.incoming() {
         let mut stream = match stream_result {

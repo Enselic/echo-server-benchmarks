@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"os"
 )
 
 func handleConn(c net.Conn) {
@@ -28,13 +30,19 @@ func handleConn(c net.Conn) {
 }
 
 func main() {
-	ln, err := net.Listen("tcp", ":9002")
+	if len(os.Args) != 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s <port>\n", os.Args[0])
+		os.Exit(2)
+	}
+
+	addr := ":" + os.Args[1]
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer ln.Close()
 
-	log.Println("Go TCP echo server listening on :9002")
+	log.Printf("Go TCP echo server listening on %s\n", addr)
 
 	for {
 		conn, err := ln.Accept()
