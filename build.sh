@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail -o xtrace
 
+REMOTE_ADDR=${1:-"martin@192.168.0.104"}
 TOKIO_PORT="${TOKIO_PORT:-9001}"
 GO_PORT="${GO_PORT:-9002}"
 THREADS_PORT="${THREADS_PORT:-9003}"
@@ -19,27 +20,23 @@ for server in \
 
         ./build.sh $OUTPUT_DIR/$server
 
-
-        ssh martin@192.168.0.104 pkill $server
+        ssh $REMOTE_ADDR pkill $server
         "./$server/build.sh"
-        scp build/$server martin@192.168.0.104:/tmp/$server
+        scp build/$server $REMOTE_ADDR:/tmp/$server
     )
 
         
 
-    # Build and deploy Go version
-    go build -o build/go-tcp-echo-server go-server/main.go
-
     # Build and deploy Rust tokio version
     cargo build --manifest-path rust-tokio-server/Cargo.toml --release
     cp rust-tokio-server/target/release/rust-tcp-echo-server build/
-    scp build/rust-tcp-echo-server martin@192.168.0.104:/tmp/rust-tcp-echo-server
+    scp build/rust-tcp-echo-server $REMOTE_ADDR:/tmp/rust-tcp-echo-server
 
     # Build and deploy Rust threads version
     rustc rust-threads-server/main.rs -o build/rust-threads-tcp-echo-server
-    scp build/rust-threads-tcp-echo-server martin@192.168.0.104:/tmp/rust-threads-tcp-echo-server
-
+    scp build/rust-threads-tcp-echo-server $REMOTE_ADDR:/tmp/rust-threads-tcp-echo-server
     # Run all three servers on the remote machine
-    ssh martin@192.168.0.104 "/tmp/rust-tcp-echo-server ${TOKIO_PORT}" &
-    ssh martin@192.168.0.104 "/tmp/rust-threads-tcp-echo-server ${THREADS_PORT}" &
-    ssh martin@192.168.0.104 "/tmp/go-tcp-echo-server ${GO_PORT}"
+    ssh $REMOTE_ADDR "/tmp/rust-tcp-echo-server ${TOKIO_PORT}" &
+    ssh $REMOTE_ADDR "/tmp/rust-threads-tcp-echo-server ${THREADS_PORT}" &
+    ssh $REMOTE_ADDR "/tmp/go-tcp-echo-server ${GO_PORT}"
+    
