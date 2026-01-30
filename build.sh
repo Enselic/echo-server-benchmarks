@@ -11,7 +11,7 @@ mkdir -p $OUTPUT_DIR
 for server in \
         go-tcp-echo-server \
         rust-tokio-tcp-echo-server \
-        rust-threads-tcp-echo-server \
+        rust-threaded-tcp-echo-server \
     ; do
 
     case $server in
