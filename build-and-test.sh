@@ -3,6 +3,8 @@ set -o errexit -o nounset -o pipefail
 
 TEST_HOST=${1:-"192.168.0.104"}
 TEST_USER=${2:-"martin"}
+PARALLEL_CLIENTS=${3:-10}
+
 SSH_USER_AND_HOST="${TEST_USER}@${TEST_HOST}"
 
 OUTPUT_DIR="$(pwd)/build"
@@ -46,4 +48,4 @@ sleep 10
 
 echo "Running Go client against servers on ${TEST_HOST}..."
 # TODO: Addr
-go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} 10
+go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS}
