@@ -42,5 +42,8 @@ for server_binary in "${servers_to_test[@]}"; do
     )
 done
 
+sleep 10
+
+echo "Running Go client against servers on ${TEST_HOST}..."
 # TODO: Addr
 go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} 10
