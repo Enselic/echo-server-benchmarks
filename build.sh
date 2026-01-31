@@ -15,16 +15,18 @@ for server_binary in \
     ; do
 
     (
+        server_binary_path="$OUTPUT_DIR/$server_binary"
+
         cd $server_binary
 
         # Build server binary
-        ./build.sh $OUTPUT_DIR/$server_binary
+        ./build.sh $server_binary_path
 
         # Kill old server if running
-        ssh $SSH_USER_AND_HOST pkill $server_binary
+        ssh $SSH_USER_AND_HOST pkill -f $server_binary || echo "No existing $server_binary process"
 
         # Upload server binary
-        scp build/$server_binary $SSH_USER_AND_HOST:/tmp/$server_binary
+        scp $server_binary_path $SSH_USER_AND_HOST:/tmp/$server_binary
 
         # Use a unique port
         SERVER_PORT=$((PORT_BASE++))

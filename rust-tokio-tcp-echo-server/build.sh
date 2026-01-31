@@ -3,4 +3,5 @@ set -o errexit -o nounset -o pipefail -o xtrace
 
 output_path="$1"
 
-go build -o "$output_path" main.go
+cargo build --release
+cp target/release/rust-tokio-tcp-echo-server "$output_path"
