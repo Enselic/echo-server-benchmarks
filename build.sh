@@ -6,13 +6,16 @@ SSH_USER_AND_HOST=${1:-"martin@192.168.0.104"}
 OUTPUT_DIR="$(pwd)/build"
 mkdir -p $OUTPUT_DIR
 
-PORT_BASE=7000
+SERVER_PORT=7000
 
 for server_binary in \
         go-tcp-echo-server \
         rust-tokio-tcp-echo-server \
         rust-threaded-tcp-echo-server \
     ; do
+
+    # Use a unique port
+    SERVER_PORT=$((SERVER_PORT+1))
 
     (
         cd $server_binary
@@ -28,8 +31,6 @@ for server_binary in \
         # Upload server binary
         scp $server_binary_path $SSH_USER_AND_HOST:/tmp/$server_binary
 
-        # Use a unique port
-        SERVER_PORT=$((PORT_BASE++))
 
         # Start server in background
         echo "Starting $server_binary on port ${SERVER_PORT}..."
@@ -37,4 +38,5 @@ for server_binary in \
     )
 done
 
-go run go-client/main.go
+# TODO: Addr
+go run go-client/main.go 172.17.0.2:${SERVER_PORT} 10
