@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o errexit -o nounset -o pipefail -o xtrace
+set -o errexit -o nounset -o pipefail
 
 SSH_USER_AND_HOST=${1:-"martin@192.168.0.104"}
 
@@ -15,9 +15,9 @@ for server_binary in \
     ; do
 
     (
-        server_binary_path="$OUTPUT_DIR/$server_binary"
-
         cd $server_binary
+
+        server_binary_path="$OUTPUT_DIR/$server_binary"
 
         # Build server binary
         ./build.sh $server_binary_path
@@ -32,6 +32,9 @@ for server_binary in \
         SERVER_PORT=$((PORT_BASE++))
 
         # Start server in background
+        echo "Starting $server_binary on port ${SERVER_PORT}..."
         ssh $SSH_USER_AND_HOST "/tmp/$server_binary ${SERVER_PORT}" &
     )
 done
+
+go run go-client/main.go
