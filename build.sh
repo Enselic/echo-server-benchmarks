@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
-SSH_USER_AND_HOST=${1:-"martin@192.168.0.104"}
+TEST_HOST=${1:-"192.168.0.104"}
+TEST_USER=${2:-"martin"}
+SSH_USER_AND_HOST="${TEST_USER}@${TEST_HOST}"
 
 OUTPUT_DIR="$(pwd)/build"
 mkdir -p $OUTPUT_DIR
 
 SERVER_PORT=7000
 
-for server_binary in \
-        go-tcp-echo-server \
-        rust-tokio-tcp-echo-server \
-        rust-threaded-tcp-echo-server \
-    ; do
+servers_to_test=(
+    go-tcp-echo-server \
+)
+#    rust-tokio-tcp-echo-server \
+#    rust-threaded-tcp-echo-server \
+
+for server_binary in "${servers_to_test[@]}"; do
 
     # Use a unique port
     SERVER_PORT=$((SERVER_PORT+1))
@@ -39,4 +43,4 @@ for server_binary in \
 done
 
 # TODO: Addr
-go run go-client/main.go 172.17.0.2:${SERVER_PORT} 10
+go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} 10
