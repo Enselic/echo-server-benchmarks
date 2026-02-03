@@ -74,29 +74,30 @@ fn read_cpu_times_once() -> CpuTimes {
 }
 
 fn main() {
+    let start_time = std::time::SystemTime::now();
     let mut prev = read_cpu_times_once();
     loop {
         std::thread::sleep(Duration::from_secs(1));
         let current = read_cpu_times_once();
-
+        
         // TODO: According to docs iowait can decrease
         let delta = current - prev;
         let total = delta.user
-            + delta.nice
-            + delta.system
-            + delta.idle
-            + delta.iowait
-            + delta.irq
-            + delta.softirq
-            + delta.steal
-            + delta.guest
-            + delta.guest_nice;
+        + delta.nice
+        + delta.system
+        + delta.idle
+        + delta.iowait
+        + delta.irq
+        + delta.softirq
+        + delta.steal
+        + delta.guest
+        + delta.guest_nice;
         let idle_equiv = delta.idle + delta.iowait + delta.guest + delta.guest_nice;
         let usage = total - idle_equiv;
         let usage_percentage = (usage as f64 / total as f64) * 100.0;
-        // eprintln!("Total CPU Time Delta: {}", total);
-        // eprintln!("Idle Equivalent Time Delta: {}", idle_equiv);
-        println!("CPU Usage Percentage: {:.2}%", usage_percentage);
+
+        let elapsed = start_time.elapsed().unwrap().as_secs_f64();
+        println!("{elapsed:.2} {usage_percentage:.2}%");
 
         prev = current;
     }
