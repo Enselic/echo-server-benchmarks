@@ -12,13 +12,13 @@ const OUTPUT_PNG: &str = "cpu_idle.png";
 #[derive(Clone, Copy, Debug)]
 struct CpuTimes {
     /// (1) Time spent in user mode.
-    line: u64,
-    /// (2) Time spent in user mode with low priority (nice).
     user: u64,
-    /// (3) Time spent in system mode.
+    /// (2) Time spent in user mode with low priority (nice).
     nice: u64,
-    /// (4) Time spent in the idle task.
+    /// (3) Time spent in system mode.
     system: u64,
+    /// (4) Time spent in the idle task.
+    idle: u64,
     /// (5) Time waiting for I/O to complete.
     iowait: u64,
     /// (6) Time servicing interrupts.
@@ -38,24 +38,20 @@ fn read_cpu_times_once() -> CpuTimes {
     let cpu_times = stat.lines().next().unwrap();
 
     let mut parts = cpu_times.split_whitespace();
-    let tag = parts.next().expect("bad /proc/stat line");
-    assert_eq!(tag, "cpu", "first line of /proc/stat didn't start with 'cpu'");
+    assert_eq!(parts.next().unwrap(), "cpu");
 
-    let nums: Vec<u64> = parts
-        .map(|s| s.parse::<u64>().expect("parsing cpu fields"))
-        .collect();
-
+    let mut parts = parts.map(|s| s.parse::<u64>().unwrap());
     CpuTimes {
-        line: nums.get(0).cloned().unwrap_or(0),
-        user: nums.get(1).cloned().unwrap_or(0),
-        nice: nums.get(2).cloned().unwrap_or(0),
-        system: nums.get(3).cloned().unwrap_or(0),
-        iowait: nums.get(4).cloned().unwrap_or(0),
-        irq: nums.get(5).cloned().unwrap_or(0),
-        softirq: nums.get(6).cloned().unwrap_or(0),
-        steal: nums.get(7).cloned().unwrap_or(0),
-        guest: nums.get(8).cloned().unwrap_or(0),
-        guest_nice: nums.get(9).cloned().unwrap_or(0),
+        user: parts.next().unwrap(),
+        nice: parts.next().unwrap(),
+        system: parts.next().unwrap(),
+        idle: parts.next().unwrap(),
+        iowait: parts.next().unwrap(),
+        irq: parts.next().unwrap(),
+        softirq: parts.next().unwrap(),
+        steal: parts.next().unwrap(),
+        guest: parts.next().unwrap(),
+        guest_nice: parts.next().unwrap(),
     }
 }
 
