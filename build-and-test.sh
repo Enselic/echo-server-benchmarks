@@ -37,15 +37,11 @@ for server_binary in "${servers_to_test[@]}"; do
         # Upload server binary
         scp $server_binary_path $SSH_USER_AND_HOST:/tmp/$server_binary
 
-
         # Start server in background
         echo "Starting $server_binary on port ${SERVER_PORT}..."
         ssh $SSH_USER_AND_HOST "/tmp/$server_binary ${SERVER_PORT}" &
+    
+        # Run test
+        timeout 5s go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS}
     )
 done
-
-sleep 10
-
-echo "Running Go client against servers on ${TEST_HOST}..."
-# TODO: Addr
-go run go-client/main.go ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS}
