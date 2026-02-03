@@ -97,8 +97,26 @@ fn main() {
         let usage_percentage = (usage as f64 / total as f64) * 100.0;
 
         let elapsed = start_time.elapsed().unwrap().as_secs_f64();
-        println!("{elapsed:.2} {usage_percentage:.2}%");
+        let mem_available = get_mem_available().unwrap_or(0);
+        println!("{elapsed:.2}	{usage_percentage:.2}	{mem_available}");
 
         prev = current;
     }
+}
+
+
+fn get_mem_available() -> Option<u64> {
+    let file = File::open("/proc/meminfo").ok()?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().flatten() {
+        if line.starts_with("MemAvailable:") {
+            return line
+                .split_whitespace()
+                .nth(1)?
+                .parse::<u64>()
+                .ok();
+        }
+    }
+    None
 }
