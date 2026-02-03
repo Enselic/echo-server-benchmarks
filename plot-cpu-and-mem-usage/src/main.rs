@@ -8,7 +8,7 @@ const INTERVAL_SECS: f64 = 1.0;  // seconds between samples
 const DURATION_SECS: f64 = 60.0; // total seconds to record
 const OUTPUT_PNG: &str = "cpu_idle.png";
 
-/// See `man proc_stat`.
+/// Field docs taken from `man proc_stat`.
 #[derive(Clone, Copy, Debug)]
 struct CpuTimes {
     /// (1) Time spent in user mode.
@@ -31,6 +31,32 @@ struct CpuTimes {
     guest: u64,
     /// (10) Time spent running a niced guest (virtual CPU for guest operating systems under the control of the Linux kernel).
     guest_nice: u64,
+}
+
+fn read_cpu_times_once() -> CpuTimes {
+    let stat = fs::read_to_string("/proc/stat").unwrap();
+    let cpu_times = stat.lines().next().unwrap();
+
+    let mut parts = cpu_times.split_whitespace();
+    let tag = parts.next().expect("bad /proc/stat line");
+    assert_eq!(tag, "cpu", "first line of /proc/stat didn't start with 'cpu'");
+
+    let nums: Vec<u64> = parts
+        .map(|s| s.parse::<u64>().expect("parsing cpu fields"))
+        .collect();
+
+    CpuTimes {
+        line: nums.get(0).cloned().unwrap_or(0),
+        user: nums.get(1).cloned().unwrap_or(0),
+        nice: nums.get(2).cloned().unwrap_or(0),
+        system: nums.get(3).cloned().unwrap_or(0),
+        iowait: nums.get(4).cloned().unwrap_or(0),
+        irq: nums.get(5).cloned().unwrap_or(0),
+        softirq: nums.get(6).cloned().unwrap_or(0),
+        steal: nums.get(7).cloned().unwrap_or(0),
+        guest: nums.get(8).cloned().unwrap_or(0),
+        guest_nice: nums.get(9).cloned().unwrap_or(0),
+    }
 }
 
 /// Reads the aggregate CPU line: "cpu  user nice system idle iowait irq softirq steal guest guest_nice"
