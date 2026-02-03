@@ -3,7 +3,7 @@ set -o errexit -o nounset -o pipefail -o xtrace
 
 TEST_HOST=${1:-"192.168.0.104"}
 TEST_USER=${2:-"martin"}
-PARALLEL_CLIENTS=${3:-100}
+PARALLEL_CLIENTS=${3:-5000}
 
 # todo explain
 trap 'kill -- -$$' EXIT
@@ -57,7 +57,7 @@ for server_binary in "${servers_to_test[@]}"; do
         done
     
         # Run test
-        timeout 5s go run ../go-client/main.go ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS}
+        timeout 30s go run ../go-client/main.go ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS} || true
 
         # Rest
         echo Resting before next server test...

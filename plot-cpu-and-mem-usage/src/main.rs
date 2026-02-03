@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::BufRead;
 use std::ops::Sub;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -106,8 +107,8 @@ fn main() {
 
 
 fn get_mem_available() -> Option<u64> {
-    let file = File::open("/proc/meminfo").ok()?;
-    let reader = BufReader::new(file);
+    let file = std::fs::File::open("/proc/meminfo").ok()?;
+    let reader = std::io::BufReader::new(file);
 
     for line in reader.lines().flatten() {
         if line.starts_with("MemAvailable:") {
