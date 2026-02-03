@@ -3,7 +3,7 @@ use std::ops::Sub;
 use std::thread;
 use std::time::{Duration, Instant};
 
-const INTERVAL_SECS: f64 = 1.0;  // seconds between samples
+const INTERVAL_SECS: f64 = 1.0; // seconds between samples
 const DURATION_SECS: f64 = 60.0; // total seconds to record
 const OUTPUT_PNG: &str = "cpu_idle.png";
 
@@ -74,22 +74,30 @@ fn read_cpu_times_once() -> CpuTimes {
 }
 
 fn main() {
-    let initial = read_cpu_times_once();
-    std::thread::sleep(Duration::from_secs(1));
-    let later = read_cpu_times_once();
-    // TODO: According to docs iowait can decrease
-    let delta = later - initial;
-    let total = delta.user
-        + delta.nice
-        + delta.system
-        + delta.idle
-        + delta.iowait
-        + delta.irq
-        + delta.softirq
-        + delta.steal
-        + delta.guest
-        + delta.guest_nice;
-    let idle_equiv = delta.idle + delta.iowait + delta.guest + delta.guest_nice;
-    let idle_percentage = (idle_equiv as f64 / total as f64) * 100.0;
-    println!("CPU Idle Percentage: {:.2}%", idle_percentage);
+    let mut prev = read_cpu_times_once();
+    loop {
+        std::thread::sleep(Duration::from_secs(1));
+        let current = read_cpu_times_once();
+
+        // TODO: According to docs iowait can decrease
+        let delta = current - prev;
+        let total = delta.user
+            + delta.nice
+            + delta.system
+            + delta.idle
+            + delta.iowait
+            + delta.irq
+            + delta.softirq
+            + delta.steal
+            + delta.guest
+            + delta.guest_nice;
+        let idle_equiv = delta.idle + delta.iowait + delta.guest + delta.guest_nice;
+        let usage = total - idle_equiv;
+        let usage_percentage = (usage as f64 / total as f64) * 100.0;
+        // eprintln!("Total CPU Time Delta: {}", total);
+        // eprintln!("Idle Equivalent Time Delta: {}", idle_equiv);
+        println!("CPU Usage Percentage: {:.2}%", usage_percentage);
+
+        prev = current;
+    }
 }
