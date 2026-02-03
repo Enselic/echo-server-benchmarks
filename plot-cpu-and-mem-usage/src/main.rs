@@ -1,4 +1,5 @@
 use std::fs;
+use std::ops::Sub;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -31,6 +32,25 @@ struct CpuTimes {
     guest_nice: u64,
 }
 
+impl Sub for CpuTimes {
+    type Output = CpuTimes;
+
+    fn sub(self, rhs: CpuTimes) -> Self::Output {
+        CpuTimes {
+            user: self.user.strict_sub(rhs.user),
+            nice: self.nice.strict_sub(rhs.nice),
+            system: self.system.strict_sub(rhs.system),
+            idle: self.idle.strict_sub(rhs.idle),
+            iowait: self.iowait.strict_sub(rhs.iowait),
+            irq: self.irq.strict_sub(rhs.irq),
+            softirq: self.softirq.strict_sub(rhs.softirq),
+            steal: self.steal.strict_sub(rhs.steal),
+            guest: self.guest.strict_sub(rhs.guest),
+            guest_nice: self.guest_nice.strict_sub(rhs.guest_nice),
+        }
+    }
+}
+
 fn read_cpu_times_once() -> CpuTimes {
     let stat = fs::read_to_string("/proc/stat").unwrap();
     let cpu_times = stat.lines().next().unwrap();
@@ -57,4 +77,19 @@ fn main() {
     let initial = read_cpu_times_once();
     std::thread::sleep(Duration::from_secs(1));
     let later = read_cpu_times_once();
+    // TODO: According to docs iowait can decrease
+    let delta = later - initial;
+    let total = delta.user
+        + delta.nice
+        + delta.system
+        + delta.idle
+        + delta.iowait
+        + delta.irq
+        + delta.softirq
+        + delta.steal
+        + delta.guest
+        + delta.guest_nice;
+    let idle_equiv = delta.idle + delta.iowait + delta.guest + delta.guest_nice;
+    let idle_percentage = (idle_equiv as f64 / total as f64) * 100.0;
+    println!("CPU Idle Percentage: {:.2}%", idle_percentage);
 }
