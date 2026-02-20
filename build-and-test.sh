@@ -16,12 +16,12 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 OUTPUT_DIR="$(pwd)/build"
 mkdir -p $OUTPUT_DIR
 
-SERVER_PORT=7010
+SERVER_PORT=7020
 
 servers_to_test=(
-    # go-tcp-echo-server
+    go-tcp-echo-server
     rust-tokio-tcp-echo-server
-    # rust-threaded-tcp-echo-server
+    rust-threaded-tcp-echo-server
 )
 
 for server_binary in "${servers_to_test[@]}"; do
@@ -45,7 +45,7 @@ for server_binary in "${servers_to_test[@]}"; do
 
         # Start server in background
         echo "Starting $server_binary on port ${SERVER_PORT}..."
-        ssh $SSH_USER_AND_HOST 'ulimit -n $(cat /proc/sys/fs/nr_open) && /tmp/$server_binary ${SERVER_PORT}' &
+        ssh $SSH_USER_AND_HOST "ulimit -n 1048576 && /tmp/$server_binary ${SERVER_PORT}" &
 
         # Wait for server to start. Wait for port to be open
         echo "Waiting for $server_binary to start..."
