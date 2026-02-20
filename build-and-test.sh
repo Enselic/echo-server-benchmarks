@@ -10,6 +10,9 @@ trap 'kill -- -$$' EXIT
 
 SSH_USER_AND_HOST="${TEST_USER}@${TEST_HOST}"
 
+# Don't let fd count limit us
+ulimit -n $(cat /proc/sys/fs/nr_open)
+
 OUTPUT_DIR="$(pwd)/build"
 mkdir -p $OUTPUT_DIR
 
@@ -42,7 +45,7 @@ for server_binary in "${servers_to_test[@]}"; do
 
         # Start server in background
         echo "Starting $server_binary on port ${SERVER_PORT}..."
-        ssh $SSH_USER_AND_HOST "/tmp/$server_binary ${SERVER_PORT}" &
+        ssh $SSH_USER_AND_HOST 'ulimit -n $(cat /proc/sys/fs/nr_open) && /tmp/$server_binary ${SERVER_PORT}' &
 
         # Wait for server to start. Wait for port to be open
         echo "Waiting for $server_binary to start..."
