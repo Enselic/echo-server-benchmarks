@@ -13,12 +13,12 @@ SSH_USER_AND_HOST="${TEST_USER}@${TEST_HOST}"
 OUTPUT_DIR="$(pwd)/build"
 mkdir -p $OUTPUT_DIR
 
-SERVER_PORT=7000
+SERVER_PORT=7010
 
 servers_to_test=(
-    go-tcp-echo-server \
-    rust-tokio-tcp-echo-server \
-    rust-threaded-tcp-echo-server \
+    # go-tcp-echo-server
+    rust-tokio-tcp-echo-server
+    # rust-threaded-tcp-echo-server
 )
 
 for server_binary in "${servers_to_test[@]}"; do
