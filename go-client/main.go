@@ -50,7 +50,7 @@ func main() {
 				c, err := net.Dial("tcp", addr)
 				if err != nil {
 					os.Stderr.WriteString("failed to connect to " + addr + ": " + err.Error() + "\n")
-					time.Sleep(1 * time.Second)
+					os.Exit(1)
 					continue
 				}
 				// Keep this connection busy forever (until server/client dies).
