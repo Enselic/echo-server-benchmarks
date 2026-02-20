@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 )
 
 func main() {
@@ -35,12 +36,21 @@ func main() {
 	payload := []byte("pingpingpingpingpingpingpingping") // any bytes are fine
 	reply := make([]byte, len(payload))
 
+	// Preflight: ensure we can connect at all before spawning concurrent clients.
+	if c, err := net.DialTimeout("tcp", addr, 20*time.Second); err != nil {
+		os.Stderr.WriteString("failed to connect to " + addr + ": " + err.Error() + "\n")
+		os.Exit(1)
+	} else {
+		_ = c.Close()
+	}
+
 	for i := 0; i < n; i++ {
 		go func() {
 			for {
 				c, err := net.Dial("tcp", addr)
 				if err != nil {
 					os.Stderr.WriteString("failed to connect to " + addr + ": " + err.Error() + "\n")
+					time.Sleep(1 * time.Second)
 					continue
 				}
 				// Keep this connection busy forever (until server/client dies).
