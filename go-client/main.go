@@ -33,7 +33,7 @@ func doRequest(addr string, clientID uint32, seq uint32) (err error) {
 
 	conn, err := net.DialTimeout("tcp", addr, 20*time.Second)
 	if err != nil {
-		return err
+		return fmt.Errorf("client %d connect timed out on %d: %v", clientID, seq, err)
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
@@ -54,7 +54,7 @@ func doRequest(addr string, clientID uint32, seq uint32) (err error) {
 			written += n
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("client %d timed out on %d write: %v", clientID, seq, err)
 		}
 		if n == 0 {
 			return errors.New("short write")
@@ -62,10 +62,10 @@ func doRequest(addr string, clientID uint32, seq uint32) (err error) {
 	}
 	replyBytes := make([]byte, 8)
 	if _, err := io.ReadFull(conn, replyBytes); err != nil {
-		return err
+		return fmt.Errorf("client %d timed out on %d read: %v", clientID, seq, err)
 	}
 	if got := binary.BigEndian.Uint64(replyBytes); got != payloadValue {
-		return fmt.Errorf("echo mismatch: want %d got %d", payloadValue, got)
+		return fmt.Errorf("client %d echo mismatch on %d: want %d got %d", clientID, seq, payloadValue, got)
 	}
 
 	return nil
@@ -86,7 +86,7 @@ func main() {
 	worker := func(clientID uint32, toSend uint64) {
 		defer wg.Done()
 		var seq uint32
-		fatalFailure := func(err error) {
+		osExitWithFailure := func(err error) {
 			os.Stderr.WriteString("request failed: " + err.Error() + "\n")
 			os.Exit(1)
 		}
@@ -94,12 +94,12 @@ func main() {
 		for i := uint64(0); i < toSend; i++ {
 			seq++
 			if seq == 0 {
-				fatalFailure(errors.New("per-client sequence overflow"))
+				osExitWithFailure(errors.New("per-client sequence overflow"))
 				return
 			}
 			err := doRequest(args.Addr, clientID, seq)
 			if err != nil {
-				fatalFailure(err)
+				osExitWithFailure(err)
 				return
 			}
 		}
