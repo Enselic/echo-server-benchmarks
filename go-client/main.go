@@ -41,33 +41,24 @@ func main() {
 
 		var payload [8]byte
 		reply := make([]byte, len(payload))
-		var c net.Conn
 		var seq uint32
-		defer func() {
-			if c != nil {
-				_ = c.Close()
-			}
-		}()
-		reportErr := func(err error) {
+		fatalFailure := func(err error) {
 			os.Stderr.WriteString("request failed: " + err.Error() + "\n")
 			os.Exit(1)
 		}
 
 		for i := uint64(0); i < toSend; i++ {
-			if c == nil {
-				conn, err := net.DialTimeout("tcp", args.Addr, 20*time.Second)
-				if err != nil {
-					reportErr(err)
-					return
-				}
-				c = conn
+			conn, err := net.DialTimeout("tcp", args.Addr, 20*time.Second)
+			if err != nil {
+				fatalFailure(err)
+				return
 			}
-
-			_ = c.SetDeadline(time.Now().Add(20 * time.Second))
+			_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
 
 			seq++
 			if seq == 0 {
-				reportErr(errors.New("per-client sequence overflow"))
+				_ = conn.Close()
+				fatalFailure(errors.New("per-client sequence overflow"))
 				return
 			}
 			v := (uint64(clientID) << 32) | uint64(seq)
@@ -75,33 +66,33 @@ func main() {
 
 			written := 0
 			for written < len(payload) {
-				n, err := c.Write(payload[written:])
+				n, err := conn.Write(payload[written:])
 				if n > 0 {
 					written += n
 				}
 				if err != nil {
-					_ = c.Close()
-					c = nil
-					reportErr(err)
+					_ = conn.Close()
+					fatalFailure(err)
 					return
 				}
 				if n == 0 {
-					_ = c.Close()
-					c = nil
-					reportErr(errors.New("short write"))
+					_ = conn.Close()
+					fatalFailure(errors.New("short write"))
 					return
 				}
 			}
-			if _, err := io.ReadFull(c, reply); err != nil {
-				_ = c.Close()
-				c = nil
-				reportErr(err)
+			if _, err := io.ReadFull(conn, reply); err != nil {
+				_ = conn.Close()
+				fatalFailure(err)
 				return
 			}
 			if got := binary.BigEndian.Uint64(reply); got != v {
-				reportErr(fmt.Errorf("echo mismatch: want %d got %d", v, got))
+				_ = conn.Close()
+				fatalFailure(fmt.Errorf("echo mismatch: want %d got %d", v, got))
 				return
 			}
+
+			_ = conn.Close()
 		}
 	}
 
