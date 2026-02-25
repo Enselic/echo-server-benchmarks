@@ -68,6 +68,7 @@ for server_binary in "${servers_to_test[@]}"; do
                 --addr ${TEST_HOST}:${SERVER_PORT} \
                 --num-parallel-clients ${PARALLEL_CLIENTS} \
                 --num-total-requests $((PARALLEL_CLIENTS * REQUESTS_PER_CLIENT)) \
+                --debug
         )
 
         # Rest

@@ -23,14 +23,18 @@ type cliArgs struct {
 	Addr               string `arg:"--addr" default:"localhost:80" help:"TCP address host:port"`
 	NumTotalRequests   uint64 `arg:"--num-total-requests" help:"Total number of requests to send and verify"`
 	NumParallelClients uint32 `arg:"--num-parallel-clients" default:"1" help:"Number of concurrent clients"`
+	Debug              bool   `arg:"--debug" help:"Print a line for each connection attempt"`
 }
 
-func doRequest(addr string, clientID uint32, seq uint32) (err error) {
+func doRequest(addr string, clientID uint32, seq uint32, debug bool) (err error) {
 	payloadValue := (uint64(clientID) << 32) | uint64(seq)
 	// TODO: Put outside to optimize?
 	payloadBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(payloadBytes, payloadValue)
 
+	if debug {
+		fmt.Fprintf(os.Stderr, "debug: connecting client=%d seq=%d addr=%s\n", clientID, seq, addr)
+	}
 	conn, err := net.DialTimeout("tcp", addr, 120*time.Second)
 	if err != nil {
 		return fmt.Errorf("client %d connect timed out on %d: %v", clientID, seq, err)
@@ -97,7 +101,7 @@ func main() {
 				osExitWithFailure(errors.New("per-client sequence overflow"))
 				return
 			}
-			err := doRequest(args.Addr, clientID, seq)
+			err := doRequest(args.Addr, clientID, seq, args.Debug)
 			if err != nil {
 				osExitWithFailure(err)
 				return
