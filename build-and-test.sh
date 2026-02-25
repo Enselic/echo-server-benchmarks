@@ -60,7 +60,11 @@ for server_binary in "${servers_to_test[@]}"; do
         done
     
         # Run test
-        timeout 10s go run ../go-client --addr ${TEST_HOST}:${SERVER_PORT} ${PARALLEL_CLIENTS} || true
+        timeout 10s go run ../go-client \
+            --addr ${TEST_HOST}:${SERVER_PORT} \
+            --num-parallel-clients ${PARALLEL_CLIENTS} \
+            --num-requests 1000000000000 \
+            || true
 
         # Rest
         echo Resting before next server test...
