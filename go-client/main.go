@@ -7,6 +7,7 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -15,7 +16,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/alexflint/go-arg"
@@ -36,13 +36,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Any failure is complete failure
-	var errOnce sync.Once
-	var nextRequest atomic.Uint64
-	var confirmed atomic.Uint64
+	// Any failure is complete failure.
+	// Workers must not share mutable state; each worker owns its local state and
+	// only reports results back to main.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errCh := make(chan error, 1)
+	resultsCh := make(chan uint64, int(args.NumParallelClients))
+
+	perClient := args.NumTotalRequests / uint64(args.NumParallelClients)
+	remainder := args.NumTotalRequests % uint64(args.NumParallelClients)
 
 	var wg sync.WaitGroup
-	worker := func(clientID uint32) {
+	worker := func(clientID uint32, toSend uint64) {
 		defer wg.Done()
 
 		var payload [8]byte
@@ -54,18 +60,26 @@ func main() {
 				_ = c.Close()
 			}
 		}()
+		localConfirmed := uint64(0)
 
 		reportErr := func(err error) {
-			errOnce.Do(func() {
-				os.Stderr.WriteString("request failed: " + err.Error() + "\n")
-				os.Exit(1)
-			})
+			select {
+			case errCh <- err:
+				cancel()
+			default:
+				// First error wins.
+			}
 		}
 
-		for {
-			id := nextRequest.Add(1)
-			if id > args.NumTotalRequests {
+		defer func() {
+			resultsCh <- localConfirmed
+		}()
+
+		for i := uint64(0); i < toSend; i++ {
+			select {
+			case <-ctx.Done():
 				return
+			default:
 			}
 
 			if c == nil {
@@ -76,6 +90,8 @@ func main() {
 				}
 				c = conn
 			}
+
+			_ = c.SetDeadline(time.Now().Add(20 * time.Second))
 
 			seq++
 			if seq == 0 {
@@ -114,19 +130,35 @@ func main() {
 				reportErr(fmt.Errorf("echo mismatch: want %d got %d", v, got))
 				return
 			}
-
-			confirmed.Add(1)
+			localConfirmed++
 		}
 	}
 
 	for clientID := uint32(0); clientID < args.NumParallelClients; clientID++ {
+		toSend := perClient
+		if uint64(clientID) < remainder {
+			toSend++
+		}
 		wg.Add(1)
-		go worker(clientID)
+		go worker(clientID, toSend)
 	}
 
 	wg.Wait()
-	if confirmed.Load() != args.NumTotalRequests {
-		os.Stderr.WriteString("incomplete: confirmed " + strconv.FormatUint(confirmed.Load(), 10) + " of " + strconv.FormatUint(args.NumTotalRequests, 10) + "\n")
+	close(resultsCh)
+
+	select {
+	case err := <-errCh:
+		os.Stderr.WriteString("request failed: " + err.Error() + "\n")
+		os.Exit(1)
+	default:
+	}
+
+	confirmed := uint64(0)
+	for n := range resultsCh {
+		confirmed += n
+	}
+	if confirmed != args.NumTotalRequests {
+		os.Stderr.WriteString("incomplete: confirmed " + strconv.FormatUint(confirmed, 10) + " of " + strconv.FormatUint(args.NumTotalRequests, 10) + "\n")
 		os.Exit(1)
 	}
 }
