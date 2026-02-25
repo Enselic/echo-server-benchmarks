@@ -25,7 +25,7 @@ import (
 type cliArgs struct {
 	Addr               string `arg:"--addr" default:"localhost:80" help:"TCP address host:port"`
 	NumTotalRequests   uint64 `arg:"--num-total-requests" help:"Total number of requests to send and verify"`
-	NumParallelClients int    `arg:"--num-parallel-clients" default:"1" help:"Number of concurrent clients"`
+	NumParallelClients uint32 `arg:"--num-parallel-clients" default:"1" help:"Number of concurrent clients"`
 }
 
 func main() {
@@ -33,16 +33,13 @@ func main() {
 	parser := arg.MustParse(&args)
 
 	if _, _, err := net.SplitHostPort(args.Addr); err != nil {
-		parser.Fail("addr must be in the form host:port")
+		parser.Fail("addr must be in the form host:port. err: " + err.Error())
 	}
 	if args.NumTotalRequests == 0 {
 		parser.Fail("--num-total-requests must be > 0")
 	}
-	if args.NumParallelClients <= 0 {
+	if args.NumParallelClients == 0 {
 		parser.Fail("--num-parallel-clients must be > 0")
-	}
-	if uint64(args.NumParallelClients) > uint64(^uint32(0)) {
-		parser.Fail("--num-parallel-clients too large")
 	}
 
 	// Preflight: ensure we can connect at all before spawning concurrent clients.
@@ -145,9 +142,9 @@ func main() {
 		}
 	}
 
-	for i := 0; i < args.NumParallelClients; i++ {
+	for clientID := uint32(0); clientID < args.NumParallelClients; clientID++ {
 		wg.Add(1)
-		go worker(uint32(i))
+		go worker(clientID)
 	}
 
 	wg.Wait()
