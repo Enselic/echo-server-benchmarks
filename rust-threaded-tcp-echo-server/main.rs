@@ -10,7 +10,7 @@ fn main() -> std::io::Result<()> {
 
     let bind_addr = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(&bind_addr)?;
-    println!("TCP echo server listening on {}", bind_addr);
+    println!("Rust threaded TCP echo server listening on {}", bind_addr);
 
     for stream_result in listener.incoming() {
         let mut stream = match stream_result {

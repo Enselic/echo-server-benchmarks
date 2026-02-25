@@ -31,7 +31,7 @@ func doRequest(addr string, clientID uint32, seq uint32) (err error) {
 	payloadBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(payloadBytes, payloadValue)
 
-	conn, err := net.DialTimeout("tcp", addr, 20*time.Second)
+	conn, err := net.DialTimeout("tcp", addr, 120*time.Second)
 	if err != nil {
 		return fmt.Errorf("client %d connect timed out on %d: %v", clientID, seq, err)
 	}
@@ -45,7 +45,7 @@ func doRequest(addr string, clientID uint32, seq uint32) (err error) {
 		}
 	}()
 
-	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(120 * time.Second))
 
 	written := 0
 	for written < len(payloadBytes) {

@@ -10,7 +10,7 @@ async fn main() -> std::io::Result<()> {
 
     let bind_addr = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(&bind_addr).await?;
-    println!("TCP echo server listening on {}", bind_addr);
+    println!("Rust async TCP echo server listening on {}", bind_addr);
 
     loop {
         let (mut socket, _addr) = listener.accept().await?;

@@ -75,3 +75,5 @@ for server_binary in "${servers_to_test[@]}"; do
         sleep 5
     )
 done
+
+echo All tests completed successfully!
