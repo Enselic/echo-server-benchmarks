@@ -7,14 +7,12 @@
 package main
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -30,23 +28,13 @@ type cliArgs struct {
 func main() {
 	args := parseArgs()
 
-	// ensure we can connect at all before spawning concurrent clients.
+	// Ensure we can connect at all before spawning concurrent clients.
 	if err := waitForAddrWithTimeout(args.Addr, 20*time.Second); err != nil {
 		os.Stderr.WriteString("failed to connect to " + args.Addr + ": " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
-	// Any failure is complete failure.
-	// Workers must not share mutable state; each worker owns its local state and
-	// only reports results back to main.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	errCh := make(chan error, 1)
-	resultsCh := make(chan uint64, int(args.NumParallelClients))
-
-	perClient := args.NumTotalRequests / uint64(args.NumParallelClients)
-	remainder := args.NumTotalRequests % uint64(args.NumParallelClients)
-
+	// This is the code each client will run.
 	var wg sync.WaitGroup
 	worker := func(clientID uint32, toSend uint64) {
 		defer wg.Done()
@@ -60,28 +48,12 @@ func main() {
 				_ = c.Close()
 			}
 		}()
-		localConfirmed := uint64(0)
-
 		reportErr := func(err error) {
-			select {
-			case errCh <- err:
-				cancel()
-			default:
-				// First error wins.
-			}
+			os.Stderr.WriteString("request failed: " + err.Error() + "\n")
+			os.Exit(1)
 		}
 
-		defer func() {
-			resultsCh <- localConfirmed
-		}()
-
 		for i := uint64(0); i < toSend; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
 			if c == nil {
 				conn, err := net.DialTimeout("tcp", args.Addr, 20*time.Second)
 				if err != nil {
@@ -130,37 +102,29 @@ func main() {
 				reportErr(fmt.Errorf("echo mismatch: want %d got %d", v, got))
 				return
 			}
-			localConfirmed++
 		}
 	}
 
+	// For improved throughput, we don't want workers to share state, so do some
+	// bookkeeping to allow clients to work independently.
+	perClient := args.NumTotalRequests / uint64(args.NumParallelClients)
+	remainder := args.NumTotalRequests % uint64(args.NumParallelClients)
+
+	// Launch all clients
 	for clientID := uint32(0); clientID < args.NumParallelClients; clientID++ {
 		toSend := perClient
+
+		// Adjust toSend to get exactly NumTotalRequests across all clients,
+		// even when it's not perfectly divisible.
 		if uint64(clientID) < remainder {
 			toSend++
 		}
+
 		wg.Add(1)
 		go worker(clientID, toSend)
 	}
 
 	wg.Wait()
-	close(resultsCh)
-
-	select {
-	case err := <-errCh:
-		os.Stderr.WriteString("request failed: " + err.Error() + "\n")
-		os.Exit(1)
-	default:
-	}
-
-	confirmed := uint64(0)
-	for n := range resultsCh {
-		confirmed += n
-	}
-	if confirmed != args.NumTotalRequests {
-		os.Stderr.WriteString("incomplete: confirmed " + strconv.FormatUint(confirmed, 10) + " of " + strconv.FormatUint(args.NumTotalRequests, 10) + "\n")
-		os.Exit(1)
-	}
 }
 
 func waitForAddrWithTimeout(addr string, timeout time.Duration) error {
