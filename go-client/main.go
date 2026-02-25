@@ -29,25 +29,14 @@ type cliArgs struct {
 }
 
 func main() {
-	var args cliArgs
-	parser := arg.MustParse(&args)
-
-	if _, _, err := net.SplitHostPort(args.Addr); err != nil {
-		parser.Fail("addr must be in the form host:port. err: " + err.Error())
-	}
-	if args.NumTotalRequests == 0 {
-		parser.Fail("--num-total-requests must be > 0")
-	}
-	if args.NumParallelClients == 0 {
-		parser.Fail("--num-parallel-clients must be > 0")
-	}
+	args := parseArgs()
 
 	// Preflight: ensure we can connect at all before spawning concurrent clients.
-	if c, err := net.DialTimeout("tcp", args.Addr, 20*time.Second); err != nil {
+	if conn, err := net.DialTimeout("tcp", args.Addr, 20*time.Second); err != nil {
 		os.Stderr.WriteString("failed to connect to " + args.Addr + ": " + err.Error() + "\n")
 		os.Exit(1)
 	} else {
-		_ = c.Close()
+		_ = conn.Close()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -158,4 +147,21 @@ func main() {
 		os.Stderr.WriteString("incomplete: confirmed " + strconv.FormatUint(confirmed.Load(), 10) + " of " + strconv.FormatUint(args.NumTotalRequests, 10) + "\n")
 		os.Exit(1)
 	}
+}
+
+func parseArgs() cliArgs {
+	var args cliArgs
+	parser := arg.MustParse(&args)
+
+	if _, _, err := net.SplitHostPort(args.Addr); err != nil {
+		parser.Fail("addr must be in the form host:port. err: " + err.Error())
+	}
+	if args.NumTotalRequests == 0 {
+		parser.Fail("--num-total-requests must be > 0")
+	}
+	if args.NumParallelClients == 0 {
+		parser.Fail("--num-parallel-clients must be > 0")
+	}
+
+	return args
 }
