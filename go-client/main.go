@@ -7,7 +7,6 @@
 package main
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -31,18 +30,13 @@ type cliArgs struct {
 func main() {
 	args := parseArgs()
 
-	// Preflight: ensure we can connect at all before spawning concurrent clients.
-	if conn, err := net.DialTimeout("tcp", args.Addr, 20*time.Second); err != nil {
+	// ensure we can connect at all before spawning concurrent clients.
+	if err := waitForAddrWithTimeout(args.Addr, 20*time.Second); err != nil {
 		os.Stderr.WriteString("failed to connect to " + args.Addr + ": " + err.Error() + "\n")
 		os.Exit(1)
-	} else {
-		_ = conn.Close()
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	var firstErr atomic.Value // stores error
+	// Any failure is complete failure
 	var errOnce sync.Once
 	var nextRequest atomic.Uint64
 	var confirmed atomic.Uint64
@@ -63,18 +57,12 @@ func main() {
 
 		reportErr := func(err error) {
 			errOnce.Do(func() {
-				firstErr.Store(err)
-				cancel()
+				os.Stderr.WriteString("request failed: " + err.Error() + "\n")
+				os.Exit(1)
 			})
 		}
 
 		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-
 			id := nextRequest.Add(1)
 			if id > args.NumTotalRequests {
 				return
@@ -137,16 +125,21 @@ func main() {
 	}
 
 	wg.Wait()
-	if v := firstErr.Load(); v != nil {
-		err := v.(error)
-		os.Stderr.WriteString("request failed: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-
 	if confirmed.Load() != args.NumTotalRequests {
 		os.Stderr.WriteString("incomplete: confirmed " + strconv.FormatUint(confirmed.Load(), 10) + " of " + strconv.FormatUint(args.NumTotalRequests, 10) + "\n")
 		os.Exit(1)
 	}
+}
+
+func waitForAddrWithTimeout(addr string, timeout time.Duration) error {
+	if conn, err := net.DialTimeout("tcp", addr, timeout); err != nil {
+		return err
+	} else {
+		if err := conn.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func parseArgs() cliArgs {
