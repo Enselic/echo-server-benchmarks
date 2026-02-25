@@ -1,18 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
-	"strconv"
-
-	"github.com/alexflint/go-arg"
+	"os"
 )
-
-type cliArgs struct {
-	Port        int      `arg:"-p,--port" help:"TCP port to listen on"`
-	Positionals []string `arg:"positional" help:"<port>"`
-}
 
 func handleConn(c net.Conn) {
 	defer c.Close()
@@ -36,25 +30,12 @@ func handleConn(c net.Conn) {
 }
 
 func main() {
-	var args cliArgs
-	parser := arg.MustParse(&args)
-
-	port := args.Port
-	if port == 0 {
-		if len(args.Positionals) != 1 {
-			parser.Fail("usage: go-tcp-echo-server [-p port] <port>")
-		}
-		p, err := strconv.Atoi(args.Positionals[0])
-		if err != nil {
-			parser.Fail("port must be an integer")
-		}
-		port = p
-	}
-	if port <= 0 || port > 65535 {
-		parser.Fail("port must be between 1 and 65535")
+	if len(os.Args) != 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s <port>\n", os.Args[0])
+		os.Exit(2)
 	}
 
-	addr := ":" + strconv.Itoa(port)
+	addr := ":" + os.Args[1]
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatal(err)

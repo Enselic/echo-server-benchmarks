@@ -63,7 +63,7 @@ for server_binary in "${servers_to_test[@]}"; do
         timeout 10s go run ../go-client \
             --addr ${TEST_HOST}:${SERVER_PORT} \
             --num-parallel-clients ${PARALLEL_CLIENTS} \
-            --num-requests 1000000000000 \
+            --num-total-requests 1000000000000 \
             || true
 
         # Rest
