@@ -1,8 +1,8 @@
 // tcp_echo_stress.go
 //
 // Usage:
-//   go run tcp_echo_stress.go --num-total-requests 1000
-//   go run tcp_echo_stress.go --addr 192.168.0.100:9001 --num-total-requests 100000 --num-parallel-clients 200
+//   go run tcp_echo_stress.go --requests-per-client 1000
+//   go run tcp_echo_stress.go --addr 192.168.0.100:9001 --requests-per-client 500 --parallel-clients 200
 
 package main
 
@@ -20,10 +20,10 @@ import (
 )
 
 type cliArgs struct {
-	Addr               string `arg:"--addr" default:"localhost:80" help:"TCP address host:port"`
-	NumTotalRequests   uint64 `arg:"--num-total-requests" help:"Total number of requests to send and verify"`
-	NumParallelClients uint32 `arg:"--num-parallel-clients" default:"1" help:"Number of concurrent clients"`
-	Debug              bool   `arg:"--debug" help:"Print a line for each connection attempt"`
+	Addr              string `arg:"-a,--addr" default:"localhost:80" help:"TCP address host:port"`
+	RequestsPerClient uint64 `arg:"-r,--requests-per-client" help:"Number of requests each client sends and verifies"`
+	ParallelClients   uint32 `arg:"-p,--parallel-clients" default:"1" help:"Number of concurrent clients"`
+	Debug             bool   `arg:"--debug" help:"Print a line for each connection attempt"`
 }
 
 func doRequest(addr string, clientID uint32, seq uint32, debug bool) (err error) {
@@ -109,20 +109,9 @@ func main() {
 		}
 	}
 
-	// For improved throughput, we don't want workers to share state, so do some
-	// bookkeeping to allow clients to work independently.
-	perClient := args.NumTotalRequests / uint64(args.NumParallelClients)
-	remainder := args.NumTotalRequests % uint64(args.NumParallelClients)
-
 	// Launch all clients
-	for clientID := uint32(0); clientID < args.NumParallelClients; clientID++ {
-		toSend := perClient
-
-		// Adjust toSend to get exactly NumTotalRequests across all clients,
-		// even when it's not perfectly divisible.
-		if uint64(clientID) < remainder {
-			toSend++
-		}
+	for clientID := uint32(0); clientID < args.ParallelClients; clientID++ {
+		toSend := args.RequestsPerClient
 
 		wg.Add(1)
 		go worker(clientID, toSend)
@@ -150,11 +139,11 @@ func parseArgs() cliArgs {
 	if _, _, err := net.SplitHostPort(args.Addr); err != nil {
 		parser.Fail("addr must be in the form host:port. err: " + err.Error())
 	}
-	if args.NumTotalRequests == 0 {
-		parser.Fail("--num-total-requests must be > 0")
+	if args.RequestsPerClient == 0 {
+		parser.Fail("--requests-per-client must be > 0")
 	}
-	if args.NumParallelClients == 0 {
-		parser.Fail("--num-parallel-clients must be > 0")
+	if args.ParallelClients == 0 {
+		parser.Fail("--parallel-clients must be > 0")
 	}
 
 	return args
