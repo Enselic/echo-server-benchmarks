@@ -23,7 +23,7 @@ type cliArgs struct {
 	Addr              string `arg:"-a,--addr" default:"localhost:80" help:"TCP address host:port"`
 	RequestsPerClient uint64 `arg:"-r,--requests-per-client" help:"Number of requests each client sends and verifies"`
 	ParallelClients   uint32 `arg:"-p,--parallel-clients" default:"1" help:"Number of concurrent clients"`
-	Debug             bool   `arg:"--debug" help:"Print a line for each connection attempt"`
+	Debug             bool   `arg:"-d,--debug" help:"Print a line for each connection attempt"`
 }
 
 func dialTCP(addr string, debug bool, clientID uint32) (net.Conn, error) {
@@ -38,9 +38,6 @@ func dialTCP(addr string, debug bool, clientID uint32) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	if tcpConn, ok := conn.(*net.TCPConn); ok {
-		_ = tcpConn.SetNoDelay(true)
-	}
 	return conn, nil
 }
 
@@ -50,7 +47,7 @@ func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32) error {
 	payloadBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(payloadBytes, payloadValue)
 
-	_ = conn.SetDeadline(time.Now().Add(120 * time.Second))
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
 	written := 0
 	for written < len(payloadBytes) {
@@ -79,6 +76,7 @@ func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32) error {
 func main() {
 	args := parseArgs()
 
+	// TODO: Assume done outside of program?
 	// Ensure we can connect at all before spawning concurrent clients.
 	if err := waitForAddrWithTimeout(args.Addr, 20*time.Second); err != nil {
 		os.Stderr.WriteString("failed to connect to " + args.Addr + ": " + err.Error() + "\n")

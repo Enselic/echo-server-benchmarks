@@ -10,6 +10,7 @@ REQUESTS_PER_CLIENT=${4:-100}
 trap 'kill -- -$$' EXIT
 
 SSH_USER_AND_HOST="${TEST_USER}@${TEST_HOST}"
+DEPLOY_DIR="~/bin"
 
 # Don't let fd count limit us
 ulimit -n $(cat /proc/sys/fs/nr_open)
@@ -42,11 +43,12 @@ for server_binary in "${servers_to_test[@]}"; do
         ssh $SSH_USER_AND_HOST pkill -f $server_binary || echo "No existing $server_binary process"
 
         # Upload server binary
-        scp $server_binary_path $SSH_USER_AND_HOST:/tmp/$server_binary
+        ssh $SSH_USER_AND_HOST "mkdir -p $DEPLOY_DIR"
+        scp $server_binary_path $SSH_USER_AND_HOST:$DEPLOY_DIR/$server_binary
 
         # Start server in background
         echo "Starting $server_binary on port ${SERVER_PORT}..."
-        ssh $SSH_USER_AND_HOST "ulimit -n 1048576 && /tmp/$server_binary ${SERVER_PORT}" &
+        ssh $SSH_USER_AND_HOST "ulimit -n 1048576 && $DEPLOY_DIR/$server_binary ${SERVER_PORT}" &
 
         # Wait for server to start. Wait for port to be open
         echo "Waiting for $server_binary to start..."
