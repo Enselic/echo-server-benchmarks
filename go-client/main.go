@@ -26,28 +26,29 @@ type cliArgs struct {
 	Debug             bool   `arg:"--debug" help:"Print a line for each connection attempt"`
 }
 
-func doRequest(addr string, clientID uint32, seq uint32, debug bool) (err error) {
+func dialTCP(addr string, debug bool, clientID uint32) (net.Conn, error) {
+	if debug {
+		fmt.Fprintf(os.Stderr, "debug: dialing client=%d addr=%s\n", clientID, addr)
+	}
+	dialer := net.Dialer{
+		Timeout:   120 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+	conn, err := dialer.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if tcpConn, ok := conn.(*net.TCPConn); ok {
+		_ = tcpConn.SetNoDelay(true)
+	}
+	return conn, nil
+}
+
+func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32) error {
 	payloadValue := (uint64(clientID) << 32) | uint64(seq)
 	// TODO: Put outside to optimize?
 	payloadBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(payloadBytes, payloadValue)
-
-	if debug {
-		fmt.Fprintf(os.Stderr, "debug: connecting client=%d seq=%d addr=%s\n", clientID, seq, addr)
-	}
-	conn, err := net.DialTimeout("tcp", addr, 120*time.Second)
-	if err != nil {
-		return fmt.Errorf("client %d connect timed out on %d: %v", clientID, seq, err)
-	}
-	defer func() {
-		if cerr := conn.Close(); cerr != nil {
-			if err != nil {
-				err = fmt.Errorf("close failed after error (%v): %w", err, cerr)
-				return
-			}
-			err = fmt.Errorf("close failed: %w", cerr)
-		}
-	}()
 
 	_ = conn.SetDeadline(time.Now().Add(120 * time.Second))
 
@@ -89,22 +90,18 @@ func main() {
 	var wg sync.WaitGroup
 	worker := func(clientID uint32, toSend uint64) {
 		defer wg.Done()
-		var seq uint32
-		osExitWithFailure := func(err error) {
-			os.Stderr.WriteString("request failed: " + err.Error() + "\n")
+
+		conn, err := dialTCP(args.Addr, args.Debug, clientID)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("client %d connect failed: %v\n", clientID, err))
 			os.Exit(1)
 		}
+		defer conn.Close()
 
-		for i := uint64(0); i < toSend; i++ {
-			seq++
-			if seq == 0 {
-				osExitWithFailure(errors.New("per-client sequence overflow"))
-				return
-			}
-			err := doRequest(args.Addr, clientID, seq, args.Debug)
-			if err != nil {
-				osExitWithFailure(err)
-				return
+		for seq := uint32(1); seq <= uint32(toSend); seq++ {
+			if err := doRequestOnConn(conn, clientID, seq); err != nil {
+				os.Stderr.WriteString("request failed: " + err.Error() + "\n")
+				os.Exit(1)
 			}
 		}
 	}
