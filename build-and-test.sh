@@ -69,7 +69,8 @@ for server_binary in "${servers_to_test[@]}"; do
             go run . \
                 --addr ${TEST_HOST}:${SERVER_PORT} \
                 --parallel-clients ${PARALLEL_CLIENTS} \
-                --requests-per-client ${REQUESTS_PER_CLIENT}
+                --requests-per-client ${REQUESTS_PER_CLIENT} \
+                --payload-repeat-count 1000
         )
 
         # Rest

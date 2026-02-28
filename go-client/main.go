@@ -20,10 +20,11 @@ import (
 )
 
 type cliArgs struct {
-	Addr               string `arg:"-a,--addr" default:"localhost:80" help:"TCP address host:port"`
-	RequestsPerClient  uint64 `arg:"-r,--requests-per-client" default:"1" help:"Number of requests each client sends and verifies"`
-	ParallelClients    uint32 `arg:"-p,--parallel-clients" default:"1" help:"Number of concurrent clients"`
-	PayloadRepeatCount uint32 `arg:"-n,--payload-repeat-count" default:"1" help:"Number of times to repeat the 8-byte payload per request (min 1)"`
+	Addr              string `arg:"-a,--addr" default:"localhost:80" help:"TCP address host:port"`
+	RequestsPerClient uint64 `arg:"-r,--requests-per-client" default:"1" help:"Number of requests each client sends and verifies"`
+	ParallelClients   uint64 `arg:"-p,--parallel-clients" default:"1" help:"Number of concurrent clients"`
+	// TODO: fix -n
+	PayloadRepeatCount uint64 `arg:"-n,--payload-repeat-count" default:"1" help:"Number of times to repeat the 16-byte payload per request (min 1)"`
 	Debug              bool   `arg:"-d,--debug" help:"Print a line for each connection attempt"`
 }
 
@@ -42,17 +43,26 @@ func dialTCP(addr string, debug bool, clientID uint64) (net.Conn, error) {
 	return conn, nil
 }
 
-func doRequestOnConn(conn net.Conn, clientID uint64, seq uint64, payloadRepeatCount uint32) error {
-	// Build a 16-byte unit: [clientID (8 bytes)][seq (8 bytes)]
+func makePayloadUnit(clientID uint64, seq uint64) [16]byte {
 	var unit [16]byte
 	binary.BigEndian.PutUint64(unit[:8], clientID)
 	binary.BigEndian.PutUint64(unit[8:], seq)
+	return unit
+}
 
-	totalSize := int(payloadRepeatCount) * 16
-	payloadBytes := make([]byte, totalSize)
-	for i := uint32(0); i < payloadRepeatCount; i++ {
-		copy(payloadBytes[i*16:], unit[:])
+func makePayloadBytes(unit [16]byte, repeatCount uint64) []byte {
+	totalSize := int(repeatCount) * 16
+	buf := make([]byte, totalSize)
+	for i := uint64(0); i < repeatCount; i++ {
+		copy(buf[i*16:], unit[:])
 	}
+	return buf
+}
+
+func doRequestOnConn(conn net.Conn, clientID uint64, seq uint64, payloadRepeatCount uint64) error {
+	unit := makePayloadUnit(clientID, seq)
+	payloadBytes := makePayloadBytes(unit, payloadRepeatCount)
+	totalSize := len(payloadBytes)
 
 	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 
@@ -73,7 +83,7 @@ func doRequestOnConn(conn net.Conn, clientID uint64, seq uint64, payloadRepeatCo
 	if _, err := io.ReadFull(conn, replyBytes); err != nil {
 		return fmt.Errorf("client %d timed out on %d read: %v", clientID, seq, err)
 	}
-	for i := uint32(0); i < payloadRepeatCount; i++ {
+	for i := uint64(0); i < payloadRepeatCount; i++ {
 		off := i * 16
 		gotClient := binary.BigEndian.Uint64(replyBytes[off:])
 		gotSeq := binary.BigEndian.Uint64(replyBytes[off+8:])
@@ -118,7 +128,7 @@ func main() {
 	}
 
 	// Launch all clients
-	for clientID := uint64(0); clientID < uint64(args.ParallelClients); clientID++ {
+	for clientID := uint64(0); clientID < args.ParallelClients; clientID++ {
 		toSend := args.RequestsPerClient
 
 		wg.Add(1)
