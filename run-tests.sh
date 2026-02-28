@@ -7,14 +7,20 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="2000"
 
-for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
-    for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
-        echo "Running tests with ${PARALLEL_CLIENTS} parallel clients and payload repeat count ${PAYLOAD_REPEAT_COUNT}..."
+for SERVER in ./servers/*; do
+    for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
+        for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
+            # To make each test run take approximately the same time, we keep the
+            # total number of payloads sent by each client throughout the test
+            # constant.
+            REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
+            echo "Running test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
 
-        ./build-and-test.sh \
-            --parallel-clients ${PARALLEL_CLIENTS} \
-            --requests-per-client ${REQUESTS_PER_CLIENT} \
-            --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+            ./build-and-test.sh \
+                --parallel-clients ${PARALLEL_CLIENTS} \
+                --requests-per-client ${REQUESTS_PER_CLIENT} \
+                --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+        done
     done
 done
 
