@@ -1,30 +1,14 @@
 #!/usr/bin/env bash
-set -o errexit -o nounset -o pipefail -o xtrace
+set -o errexit -o nounset -o pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
+# First build and deploy all servers
+for SERVER in ./servers/*; do
+    if [ ! -d "$SERVER" ]; then
+        continue
+    fi
 
-mkdir -p "$OUTPUT_DIR"
-
-for i in "${!servers_to_test[@]}"; do
-    server_binary="${servers_to_test[$i]}"
-    SERVER_PORT=$(server_port_for_index $i)
-
-    (
-        cd "$SCRIPT_DIR/$server_binary"
-
-        server_binary_path="$OUTPUT_DIR/$server_binary"
-
-        # Build server binary
-        ./build.sh "$server_binary_path"
-
-        # Kill old server if running
-        ssh $SSH_USER_AND_HOST pkill -f "$server_binary" || echo "No existing $server_binary process"
-
-        # Upload server binary
-        ssh $SSH_USER_AND_HOST "mkdir -p $DEPLOY_DIR"
-        scp "$server_binary_path" "$SSH_USER_AND_HOST:$DEPLOY_DIR/$server_binary"
-    )
+    SERVER_NAME=$(basename $SERVER)
+    echo "Building and deploying $SERVER_NAME..."
+    $SERVER/build.sh ./build/$SERVER_NAME
+    scp $USER@$HOST:./build/$SERVER_NAME $USER@$HOST:~/bin/$SERVER_NAME
 done
-
-echo "All servers deployed!"

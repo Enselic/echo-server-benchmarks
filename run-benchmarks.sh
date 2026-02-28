@@ -7,14 +7,7 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="2000"
 
-# First build and deploy all servers
-for SERVER in ./servers/*; do
-    SERVER_NAME=$(basename $SERVER)
-    echo "Building and deploying $SERVER_NAME..."
-    $SERVER/build.sh ./build/$SERVER_NAME
-done
-
-# We expect many fds to be used, increase to the maximum.
+# We need many fds, so increase to max.
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
