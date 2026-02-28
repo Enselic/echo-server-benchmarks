@@ -10,9 +10,10 @@ PAYLOADS_PER_CLIENT="2000"
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
         echo "Running tests with ${PARALLEL_CLIENTS} parallel clients and payload repeat count ${PAYLOAD_REPEAT_COUNT}..."
+
         ./build-and-test.sh \
             --parallel-clients ${PARALLEL_CLIENTS} \
-            --requests-per-client ${PAYLOADS_PER_CLIENT} \
+            --requests-per-client ${REQUESTS_PER_CLIENT} \
             --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
     done
 done
