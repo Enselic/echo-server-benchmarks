@@ -140,14 +140,17 @@ func main() {
 }
 
 func waitForAddrWithTimeout(addr string, timeout time.Duration) error {
-	if conn, err := net.DialTimeout("tcp", addr, timeout); err != nil {
-		return err
-	} else {
-		if err := conn.Close(); err != nil {
+	deadline := time.Now().Add(timeout)
+	for {
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
+		if err == nil {
+			return conn.Close()
+		}
+		if time.Now().After(deadline) {
 			return err
 		}
+		time.Sleep(500 * time.Millisecond)
 	}
-	return nil
 }
 
 func parseArgs() cliArgs {

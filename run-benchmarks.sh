@@ -19,10 +19,10 @@ REMOTE_PORT=9092
 # We need many fds, so increase to max.
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
-for SERVER in ./servers/*-tcp-echo-server; do
-    SERVER_NAME=$(basename $SERVER)
-    ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
-done
+# for SERVER in ./servers/*-tcp-echo-server; do
+#     SERVER_NAME=$(basename $SERVER)
+#     ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
+# done
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
