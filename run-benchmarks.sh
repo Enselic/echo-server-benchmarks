@@ -5,9 +5,9 @@ PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
-PAYLOADS_PER_CLIENT="2000"
+PAYLOADS_PER_CLIENT="20000"
 
-REMOTE_PORT=9090
+REMOTE_PORT=9091
 
 # First deploy servers
 # if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
@@ -29,18 +29,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT} &"
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
-            # Wait for server to start
-            echo "Waiting for $SERVER_NAME to start..."
-            for j in {1..10}; do
-                if nc -z "$REMOTE_HOST" "$REMOTE_PORT"; then
-                    echo "$SERVER_NAME is up!"
-                    break
-                else
-                    echo "Waiting for $SERVER_NAME to start... ($j)"
-                    sleep 1
-                fi
-            done
-
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
             # constant.
@@ -59,3 +47,4 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     done
 done
 
+echo "All benchmarks completed successfully!"
