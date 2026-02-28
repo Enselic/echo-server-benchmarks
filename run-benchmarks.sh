@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail -x
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
@@ -23,6 +25,10 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 #     SERVER_NAME=$(basename $SERVER)
 #     ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 # done
+# Build test client from source
+echo "Building tcp-echo-server-test-client..."
+go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" "$SCRIPT_DIR/test-client"
+PATH="$SCRIPT_DIR/build:$PATH"
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
