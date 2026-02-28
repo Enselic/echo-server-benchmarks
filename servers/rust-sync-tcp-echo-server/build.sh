@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
-output_path="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_PATH="$1"
 
-rustc -O main.rs -o "$output_path"
+rustc -O "$SCRIPT_DIR/main.rs" -o "$OUTPUT_PATH"

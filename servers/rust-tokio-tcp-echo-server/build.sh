@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
-output_path="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_PATH="$(pwd)/$1"
 
+cd "$SCRIPT_DIR"
 cargo build --release
-cp target/release/rust-tokio-tcp-echo-server "$output_path"
+cp "$SCRIPT_DIR/target/release/rust-tokio-tcp-echo-server" "$OUTPUT_PATH"
