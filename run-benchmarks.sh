@@ -27,12 +27,12 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 # done
 # Build test client from source
 echo "Building tcp-echo-server-test-client..."
-go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" "$SCRIPT_DIR/test-client"
+(cd "$SCRIPT_DIR/test-client" && go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" .)
 PATH="$SCRIPT_DIR/build:$PATH"
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
-        for SERVER in ./servers/*-tcp-echo-server; do
+        for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
