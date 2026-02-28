@@ -7,6 +7,8 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="2000"
 
+REMOTE_PORT=9090
+
 # First deploy servers
 # if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
 #     echo "Error: REMOTE_HOST and REMOTE_USER environment variables must be set for deployment"
@@ -20,15 +22,19 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
         for SERVER in ./servers/*-tcp-echo-server; do
-            echo "Running ${SERVER} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
+            SERVER_NAME=$(basename $SERVER)
+            echo "Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
 
             # HERE
+
 
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
             # constant.
             REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
-            ./build-and-test.sh \
+            # TODO: build from source
+            tcp-echo-server-test-client \
+                --addr "$REMOTE_HOST:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
