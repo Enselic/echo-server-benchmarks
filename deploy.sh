@@ -24,23 +24,7 @@ for i in "${!servers_to_test[@]}"; do
         # Upload server binary
         ssh $SSH_USER_AND_HOST "mkdir -p $DEPLOY_DIR"
         scp "$server_binary_path" "$SSH_USER_AND_HOST:$DEPLOY_DIR/$server_binary"
-
-        # Start server in background
-        echo "Starting $server_binary on port ${SERVER_PORT}..."
-        ssh $SSH_USER_AND_HOST "ulimit -n 1048576 && $DEPLOY_DIR/$server_binary ${SERVER_PORT}" &
-
-        # Wait for server to start
-        echo "Waiting for $server_binary to start..."
-        for j in {1..10}; do
-            if nc -z "$TEST_HOST" "$SERVER_PORT"; then
-                echo "$server_binary is up!"
-                break
-            else
-                echo "Waiting for $server_binary to start... ($j)"
-                sleep 1
-            fi
-        done
     )
 done
 
-echo "All servers deployed and running!"
+echo "All servers deployed!"

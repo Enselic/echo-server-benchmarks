@@ -16,9 +16,7 @@ for i in "${!servers_to_test[@]}"; do
     (
         cd "$SCRIPT_DIR/go-client"
 
-        go run . \
-            --addr ${TEST_HOST}:${SERVER_PORT} \
-            "$@"
+        go run . "$@"
     )
 
     # Rest before next server test
