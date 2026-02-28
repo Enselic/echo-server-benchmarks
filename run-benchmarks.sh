@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -o errexit -o nounset -o pipefail
+set -o errexit -o nounset -o pipefail -x
 
 PARALLEL_CLIENTS_VALUES="100 700 1500"
 
@@ -23,7 +23,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
         for SERVER in ./servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
-            echo "Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
@@ -33,7 +32,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # Wait for server to start
             echo "Waiting for $SERVER_NAME to start..."
             for j in {1..10}; do
-                if nc -z "$TEST_HOST" "$SERVER_PORT"; then
+                if nc -z "$REMOTE_HOST" "$REMOTE_PORT"; then
                     echo "$SERVER_NAME is up!"
                     break
                 else
@@ -46,6 +45,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # total number of payloads sent by each client throughout the test
             # constant.
             REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
+            echo "Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
             tcp-echo-server-test-client \
                 --addr "$REMOTE_HOST:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
