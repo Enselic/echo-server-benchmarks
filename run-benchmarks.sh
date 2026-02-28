@@ -25,9 +25,9 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             SERVER_NAME=$(basename $SERVER)
 
             # Start the server on the remote host
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
-            SERVER_PID=$!
-            trap "kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null" EXIT
+            # Start the server on the remote host
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT} &"
+            trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
             # Wait for server to start
             echo "Waiting for $SERVER_NAME to start..."
@@ -53,8 +53,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
 
             # Stop the server
-            kill "$SERVER_PID" 2>/dev/null
-            wait "$SERVER_PID" 2>/dev/null
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill ${SERVER_NAME}" 2>/dev/null || true
             trap - EXIT
         done
     done
