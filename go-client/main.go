@@ -21,9 +21,9 @@ import (
 
 type cliArgs struct {
 	Addr               string `arg:"-a,--addr" default:"localhost:80" help:"TCP address host:port"`
-	RequestsPerClient  uint64 `arg:"-r,--requests-per-client" help:"Number of requests each client sends and verifies"`
+	RequestsPerClient  uint64 `arg:"-r,--requests-per-client" default:"1" help:"Number of requests each client sends and verifies"`
 	ParallelClients    uint32 `arg:"-p,--parallel-clients" default:"1" help:"Number of concurrent clients"`
-	PayloadsPerRequest uint32 `arg:"-n,--payloads-per-request" default:"1" help:"Number of times to repeat the 8-byte payload per request (min 1)"`
+	PayloadRepeatCount uint32 `arg:"-n,--payload-repeat-count" default:"1" help:"Number of times to repeat the 8-byte payload per request (min 1)"`
 	Debug              bool   `arg:"-d,--debug" help:"Print a line for each connection attempt"`
 }
 
@@ -42,14 +42,14 @@ func dialTCP(addr string, debug bool, clientID uint32) (net.Conn, error) {
 	return conn, nil
 }
 
-func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32, payloadsPerRequest uint32) error {
+func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32, payloadRepeatCount uint32) error {
 	payloadValue := (uint64(clientID) << 32) | uint64(seq)
 	var unit [8]byte
 	binary.BigEndian.PutUint64(unit[:], payloadValue)
 
-	totalSize := int(payloadsPerRequest) * 8
+	totalSize := int(payloadRepeatCount) * 8
 	payloadBytes := make([]byte, totalSize)
-	for i := uint32(0); i < payloadsPerRequest; i++ {
+	for i := uint32(0); i < payloadRepeatCount; i++ {
 		copy(payloadBytes[i*8:], unit[:])
 	}
 
@@ -72,7 +72,7 @@ func doRequestOnConn(conn net.Conn, clientID uint32, seq uint32, payloadsPerRequ
 	if _, err := io.ReadFull(conn, replyBytes); err != nil {
 		return fmt.Errorf("client %d timed out on %d read: %v", clientID, seq, err)
 	}
-	for i := uint32(0); i < payloadsPerRequest; i++ {
+	for i := uint32(0); i < payloadRepeatCount; i++ {
 		if got := binary.BigEndian.Uint64(replyBytes[i*8:]); got != payloadValue {
 			return fmt.Errorf("client %d echo mismatch on %d (copy %d): want %d got %d", clientID, seq, i, payloadValue, got)
 		}
@@ -105,7 +105,7 @@ func main() {
 		defer conn.Close()
 
 		for seq := uint32(1); seq <= uint32(toSend); seq++ {
-			if err := doRequestOnConn(conn, clientID, seq, args.PayloadsPerRequest); err != nil {
+			if err := doRequestOnConn(conn, clientID, seq, args.PayloadRepeatCount); err != nil {
 				os.Stderr.WriteString("request failed: " + err.Error() + "\n")
 				os.Exit(1)
 			}
@@ -141,15 +141,6 @@ func parseArgs() cliArgs {
 
 	if _, _, err := net.SplitHostPort(args.Addr); err != nil {
 		parser.Fail("addr must be in the form host:port. err: " + err.Error())
-	}
-	if args.RequestsPerClient == 0 {
-		parser.Fail("--requests-per-client must be > 0")
-	}
-	if args.ParallelClients == 0 {
-		parser.Fail("--parallel-clients must be > 0")
-	}
-	if args.PayloadsPerRequest < 1 {
-		parser.Fail("--payloads-per-request must be >= 1")
 	}
 
 	return args
