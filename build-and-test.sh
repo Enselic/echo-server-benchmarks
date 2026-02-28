@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail -o xtrace
 
-TEST_HOST=${1:-"192.168.0.104"}
-TEST_USER=${2:-"martin"}
-PARALLEL_CLIENTS=${3:-5000}
-REQUESTS_PER_CLIENT=${4:-5000}
+TEST_USER=${TEST_USER:-"martin"}
+TEST_HOST=${TEST_HOST:-"192.168.0.104"}
 
 # todo explain
 trap 'kill -- -$$' EXIT
@@ -68,9 +66,7 @@ for server_binary in "${servers_to_test[@]}"; do
 
             go run . \
                 --addr ${TEST_HOST}:${SERVER_PORT} \
-                --parallel-clients ${PARALLEL_CLIENTS} \
-                --requests-per-client ${REQUESTS_PER_CLIENT} \
-                --payload-repeat-count 1000
+                "$@"
         )
 
         # Rest
