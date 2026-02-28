@@ -1,4 +1,4 @@
-module tcp-echo-stress
+module tcp-echo-server-test-client
 
 go 1.21
 
