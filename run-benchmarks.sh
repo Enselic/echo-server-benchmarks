@@ -7,13 +7,22 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="2000"
 
+# First deploy servers
+# if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
+#     echo "Error: REMOTE_HOST and REMOTE_USER environment variables must be set for deployment"
+#     exit 1
+# fi
+# ./servers/deploy.sh
+
 # We need many fds, so increase to max.
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
-        for SERVER in ./servers/*; do
+        for SERVER in ./servers/*-tcp-echo-server; do
             echo "Running ${SERVER} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
+
+            # HERE
 
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
