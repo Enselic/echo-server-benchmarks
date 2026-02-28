@@ -7,15 +7,25 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="2000"
 
+# First build and deploy all servers
 for SERVER in ./servers/*; do
-    for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
-        for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
+    SERVER_NAME=$(basename $SERVER)
+    echo "Building and deploying $SERVER_NAME..."
+    $SERVER/build.sh ./build/$SERVER_NAME
+done
+
+# We expect many fds to be used, increase to the maximum.
+ulimit -n $(cat /proc/sys/fs/nr_open)
+
+for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
+    for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
+        for SERVER in ./servers/*; do
+            echo "Running ${SERVER} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
+
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
             # constant.
             REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
-            echo "Running test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
-
             ./build-and-test.sh \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \
@@ -27,8 +37,6 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-# Don't let fd count limit us
-ulimit -n $(cat /proc/sys/fs/nr_open)
 
 for i in "${!servers_to_test[@]}"; do
     server_binary="${servers_to_test[$i]}"
