@@ -25,42 +25,38 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             SERVER_NAME=$(basename $SERVER)
             echo "Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
 
-            # HERE
+            # Start the server on the remote host
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
+            SERVER_PID=$!
+            trap "kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null" EXIT
 
+            # Wait for server to start
+            echo "Waiting for $SERVER_NAME to start..."
+            for j in {1..10}; do
+                if nc -z "$TEST_HOST" "$SERVER_PORT"; then
+                    echo "$SERVER_NAME is up!"
+                    break
+                else
+                    echo "Waiting for $SERVER_NAME to start... ($j)"
+                    sleep 1
+                fi
+            done
 
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
             # constant.
             REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
-            # TODO: build from source
             tcp-echo-server-test-client \
                 --addr "$REMOTE_HOST:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+
+            # Stop the server
+            kill "$SERVER_PID" 2>/dev/null
+            wait "$SERVER_PID" 2>/dev/null
+            trap - EXIT
         done
     done
 done
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
-
-
-for i in "${!servers_to_test[@]}"; do
-    server_binary="${servers_to_test[$i]}"
-    SERVER_PORT=$(server_port_for_index $i)
-
-    echo "Testing $server_binary on port ${SERVER_PORT}..."
-
-    (
-        cd "$SCRIPT_DIR/go-client"
-
-        go run . "$@"
-    )
-
-    # Rest before next server test
-    echo "Resting before next server test..."
-    sleep 5
-done
-
-echo "All tests completed successfully!"
