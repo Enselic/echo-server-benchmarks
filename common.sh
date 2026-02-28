@@ -13,7 +13,7 @@ SERVER_PORT_BASE=7020
 servers_to_test=(
     go-tcp-echo-server
     rust-tokio-tcp-echo-server
-    rust-threaded-tcp-echo-server
+    rust-sync-tcp-echo-server
 )
 
 # Returns a unique port for a given server index (0-based)
