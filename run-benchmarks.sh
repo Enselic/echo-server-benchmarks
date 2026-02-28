@@ -7,7 +7,7 @@ PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
 
 PAYLOADS_PER_CLIENT="200000"
 
-REMOTE_PORT=9091
+REMOTE_PORT=9092
 
 # First deploy servers
 # if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
@@ -19,15 +19,20 @@ REMOTE_PORT=9091
 # We need many fds, so increase to max.
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
+for SERVER in ./servers/*-tcp-echo-server; do
+    SERVER_NAME=$(basename $SERVER)
+    ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
+done
+
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
         for SERVER in ./servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Start the server on the remote host
-            # Start the server on the remote host
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT} &"
-            trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill ${SERVER_NAME}" 2>/dev/null || true' EXIT
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
+            trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
@@ -41,7 +46,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
 
             # Stop the server
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill ${SERVER_NAME}" 2>/dev/null || true
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
             trap - EXIT
         done
     done
