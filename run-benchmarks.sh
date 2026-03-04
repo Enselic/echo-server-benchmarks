@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-set -o errexit -o nounset -o pipefail -x
+set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="100 700 1500"
+PARALLEL_CLIENTS_VALUES="700"
+#PARALLEL_CLIENTS_VALUES="100 700 1500"
 
-PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000"
+PAYLOAD_REPEAT_COUNT_VALUES="10 100 1000 2000 4000 8000"
 
 PAYLOADS_PER_CLIENT="200000"
 
@@ -47,10 +48,10 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # To make each test run take approximately the same time, we keep the
             # total number of payloads sent by each client throughout the test
             # constant.
-            REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
+            REQUESTS_PER_CLIENT=2000
             echo "${iteration}: Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
             tcp-echo-server-test-client \
-                --addr "$REMOTE_HOST:${REMOTE_PORT}" \
+                --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
