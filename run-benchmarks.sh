@@ -30,11 +30,15 @@ echo "Building tcp-echo-server-test-client..."
 (cd "$SCRIPT_DIR/test-client" && go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" .)
 PATH="$SCRIPT_DIR/build:$PATH"
 
+iteration=1
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for PAYLOAD_REPEAT_COUNT in $PAYLOAD_REPEAT_COUNT_VALUES; do
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
+
+            # TODO: explain
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "echo $iteration > /tmp/iteration"
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
@@ -44,7 +48,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # total number of payloads sent by each client throughout the test
             # constant.
             REQUESTS_PER_CLIENT=$((PAYLOADS_PER_CLIENT / PAYLOAD_REPEAT_COUNT))
-            echo "Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
+            echo "${iteration}: Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
             tcp-echo-server-test-client \
                 --addr "$REMOTE_HOST:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
@@ -54,6 +58,8 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
             trap - EXIT
+
+            iteration=$((iteration + 1))
         done
     done
 done
