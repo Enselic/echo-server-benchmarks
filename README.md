@@ -2,7 +2,7 @@ If you are writing a new networked service, you are probably choosing between Go
 
 How do these languages compare in terms of CPU and RAM usage? Let's find out.
 
-We'll use a simple TCP echo server as our benchmark. To get definitive a definitive answer for your specific project, you'd have to implement your service in all languages and compare. But we can get a sense of the performance characteristics of each technology by implementing a simple echo server and benchmarking it.
+We'll use a simple TCP echo server as our benchmark. To get definitive a definitive answer for your specific project, you'd have to implement your service in all languages and compare. But we can get a sense of the performance characteristics of each technology by benchmarking a simple TCP echo server.
 
 ## Results
 
