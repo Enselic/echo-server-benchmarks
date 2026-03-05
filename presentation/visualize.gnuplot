@@ -24,3 +24,5 @@ refresh = 0.5
 plot datafile using 1:2 with lines lw 2 title "CPU‰", \
      ''       using 1:3 axes x1y2 with lines lw 2 title "Avail_kB"
 
+
+pause -1
