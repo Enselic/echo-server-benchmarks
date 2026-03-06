@@ -7,7 +7,11 @@ TEMP_DIR="$(mktemp -d)"
 
 trap 'rm -rf "$TEMP_DIR"' EXIT
 
-tsc --target ES2020 --module commonjs --outDir "$TEMP_DIR" "$SCRIPT_DIR/main.ts"
+if command -v tsc >/dev/null 2>&1; then
+    tsc --target ES2020 --module commonjs --outDir "$TEMP_DIR" "$SCRIPT_DIR/main.ts"
+else
+    npx --yes --package typescript tsc --target ES2020 --module commonjs --outDir "$TEMP_DIR" "$SCRIPT_DIR/main.ts"
+fi
 
 {
     echo '#!/usr/bin/env node'
