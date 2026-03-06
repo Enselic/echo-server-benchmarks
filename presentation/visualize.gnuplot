@@ -18,13 +18,18 @@ set ylabel "CPU%"
 set y2label "Avail_MB"
 set y2tics
 
+# Compute memory stats first (in MB), then keep a fixed 30 MB span on y2.
+stats datafile using ($3/1024.0) name "MEM" nooutput
+if (exists("MEM_min") && exists("MEM_max")) {
+     mem_mid = (MEM_min + MEM_max) / 2.0
+     set y2range [mem_mid - 15.0:mem_mid + 15.0]
+} else {
+     # Fallback if data is empty/unreadable.
+     set y2range [0:30]
+}
+
 # Fix CPU to percent scale.
 set yrange [0:100]
-
-# Convert memory from kB to MB and keep a fixed 30 MB span on y2.
-stats datafile using ($3/1024.0) nooutput
-mem_mid = (STATS_min + STATS_max) / 2.0
-set y2range [mem_mid - 15.0:mem_mid + 15.0]
 
 # datafile must be passed via -e "datafile='...'"
 plot datafile using 1:2 with lines lw 2 title "CPU%", \
