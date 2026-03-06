@@ -3,7 +3,7 @@ set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="70"
+PARALLEL_CLIENTS_VALUES="700"
 #PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
