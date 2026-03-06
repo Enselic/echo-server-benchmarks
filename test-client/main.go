@@ -20,6 +20,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -283,11 +284,17 @@ func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 
 	// Draw axes last so they stay visible over bars.
 	draw.Draw(img, image.Rect(leftMargin-1, topMargin, leftMargin+1, topMargin+plotHeight), axisColor, image.Point{}, draw.Src)
 	draw.Draw(img, image.Rect(leftMargin, topMargin+plotHeight-1, leftMargin+plotWidth, topMargin+plotHeight+1), axisColor, image.Point{}, draw.Src)
+	drawXAxisTicks(img, leftMargin, topMargin, plotWidth, plotHeight, maxBucketIndex, axisColor)
+	drawYAxisTicks(img, leftMargin, topMargin, plotWidth, plotHeight, maxCount, axisColor)
 
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p50, color.RGBA{220, 20, 60, 255})
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p90, color.RGBA{255, 140, 0, 255})
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p99, color.RGBA{34, 139, 34, 255})
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p999, color.RGBA{148, 0, 211, 255})
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p50, "P50", color.RGBA{220, 20, 60, 255}, 0)
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p90, "P90", color.RGBA{255, 140, 0, 255}, 1)
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p99, "P99", color.RGBA{34, 139, 34, 255}, 2)
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p999, "P999", color.RGBA{148, 0, 211, 255}, 3)
+
+	labelColor := color.RGBA{20, 20, 20, 255}
+	drawText(img, leftMargin+6, topMargin-22, "Y: COUNT (REQUESTS)", labelColor, 2)
+	drawText(img, leftMargin+plotWidth/2-120, topMargin+plotHeight+18, "X: LATENCY (MS)", labelColor, 2)
 
 	f, err := os.Create(outputPath)
 	if err != nil {
@@ -302,7 +309,48 @@ func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 
 	return outputPath, nil
 }
 
-func drawPercentileLine(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, bucketCount int, percentileValue time.Duration, line color.RGBA) {
+func drawXAxisTicks(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, maxBucketIndex int, axisColor *image.Uniform) {
+	const ticks = 10
+	for i := 0; i <= ticks; i++ {
+		ratio := float64(i) / float64(ticks)
+		x := left + int(ratio*float64(plotWidth))
+		if x >= left+plotWidth {
+			x = left + plotWidth - 1
+		}
+
+		// Tick mark.
+		draw.Draw(img, image.Rect(x, top+plotHeight-1, x+1, top+plotHeight+8), axisColor, image.Point{}, draw.Src)
+
+		valueMs := int(ratio * float64(maxBucketIndex))
+		label := fmt.Sprintf("%d", valueMs)
+		labelWidth := textPixelWidth(label, 2)
+		drawText(img, x-labelWidth/2, top+plotHeight+10, label, color.RGBA{20, 20, 20, 255}, 2)
+	}
+}
+
+func drawYAxisTicks(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, maxCount int, axisColor *image.Uniform) {
+	const ticks = 8
+	for i := 0; i <= ticks; i++ {
+		ratio := float64(i) / float64(ticks)
+		y := top + plotHeight - int(ratio*float64(plotHeight))
+		if y < top {
+			y = top
+		}
+		if y >= top+plotHeight {
+			y = top + plotHeight - 1
+		}
+
+		// Tick mark.
+		draw.Draw(img, image.Rect(left-8, y, left+1, y+1), axisColor, image.Point{}, draw.Src)
+
+		value := int(ratio * float64(maxCount))
+		label := fmt.Sprintf("%d", value)
+		labelWidth := textPixelWidth(label, 2)
+		drawText(img, left-12-labelWidth, y-7, label, color.RGBA{20, 20, 20, 255}, 2)
+	}
+}
+
+func drawPercentileLine(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, bucketCount int, percentileValue time.Duration, label string, line color.RGBA, labelRow int) {
 	positionMs := float64(percentileValue) / float64(time.Millisecond)
 	if positionMs < 0 {
 		positionMs = 0
@@ -323,6 +371,92 @@ func drawPercentileLine(img *image.RGBA, left int, top int, plotWidth int, plotH
 	}
 
 	draw.Draw(img, image.Rect(x-1, top, x+1, top+plotHeight), image.NewUniform(line), image.Point{}, draw.Src)
+
+	text := fmt.Sprintf("%s=%s", label, formatDurationMillis(percentileValue))
+	textWidth := textPixelWidth(text, 2)
+	textX := x + 6
+	if textX+textWidth > left+plotWidth-4 {
+		textX = x - 6 - textWidth
+	}
+	if textX < left+4 {
+		textX = left + 4
+	}
+	textY := top + 6 + labelRow*20
+	drawText(img, textX, textY, text, line, 2)
+}
+
+func formatDurationMillis(d time.Duration) string {
+	return strings.ToUpper(fmt.Sprintf("%.3fms", float64(d)/float64(time.Millisecond)))
+}
+
+func drawText(img *image.RGBA, x int, y int, text string, c color.RGBA, scale int) {
+	if scale < 1 {
+		scale = 1
+	}
+	cursorX := x
+	for _, raw := range strings.ToUpper(text) {
+		glyph, ok := bitmapFont5x7[raw]
+		if !ok {
+			glyph = bitmapFont5x7['?']
+		}
+		drawGlyph(img, cursorX, y, glyph, c, scale)
+		cursorX += (5+1)*scale
+	}
+}
+
+func textPixelWidth(text string, scale int) int {
+	if scale < 1 {
+		scale = 1
+	}
+	return len([]rune(text)) * (5 + 1) * scale
+}
+
+func drawGlyph(img *image.RGBA, x int, y int, rows [7]string, c color.RGBA, scale int) {
+	for rowIdx, row := range rows {
+		for colIdx, cell := range row {
+			if cell != '#' {
+				continue
+			}
+			x0 := x + colIdx*scale
+			y0 := y + rowIdx*scale
+			draw.Draw(img, image.Rect(x0, y0, x0+scale, y0+scale), image.NewUniform(c), image.Point{}, draw.Src)
+		}
+	}
+}
+
+var bitmapFont5x7 = map[rune][7]string{
+	' ': {".....", ".....", ".....", ".....", ".....", ".....", "....."},
+	'(': {"..##.", ".##..", ".#...", ".#...", ".#...", ".##..", "..##."},
+	')': {".##..", "..##.", "...#.", "...#.", "...#.", "..##.", ".##.."},
+	'.': {".....", ".....", ".....", ".....", ".....", ".##..", ".##.."},
+	'0': {".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."},
+	'1': {"..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."},
+	'2': {".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"},
+	'3': {"####.", "....#", "...#.", "..##.", "....#", "#...#", ".###."},
+	'4': {"...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."},
+	'5': {"#####", "#....", "####.", "....#", "....#", "#...#", ".###."},
+	'6': {".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."},
+	'7': {"#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."},
+	'8': {".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."},
+	'9': {".###.", "#...#", "#...#", ".####", "....#", "....#", ".###."},
+	':': {".....", ".##..", ".##..", ".....", ".##..", ".##..", "....."},
+	'=': {".....", "#####", ".....", "#####", ".....", ".....", "....."},
+	'?': {".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."},
+	'A': {".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"},
+	'C': {".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."},
+	'E': {"#####", "#....", "#....", "#####", "#....", "#....", "#####"},
+	'L': {"#....", "#....", "#....", "#....", "#....", "#....", "#####"},
+	'M': {"#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"},
+	'N': {"#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#"},
+	'O': {".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."},
+	'P': {"####.", "#...#", "#...#", "####.", "#....", "#....", "#...."},
+	'Q': {".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"},
+	'R': {"####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"},
+	'S': {".####", "#....", "#....", ".###.", "....#", "....#", "####."},
+	'T': {"#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."},
+	'U': {"#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."},
+	'X': {"#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"},
+	'Y': {"#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."},
 }
 
 func averageLatency(latencies []time.Duration) (time.Duration, error) {
