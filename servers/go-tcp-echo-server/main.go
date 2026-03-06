@@ -42,7 +42,7 @@ func main() {
 	}
 	defer ln.Close()
 
-	log.Printf("Go TCP echo server listening on %s\n", addr)
+	// log.Printf("Go TCP echo server listening on %s\n", addr)
 
 	for {
 		conn, err := ln.Accept()
