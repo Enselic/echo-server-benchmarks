@@ -31,7 +31,6 @@ echo "Building tcp-echo-server-test-client..."
 (cd "$SCRIPT_DIR/test-client" && go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" .)
 PATH="$SCRIPT_DIR/build:$PATH"
 
-iteration=1
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
         IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<< "$REQUEST_PAYLOAD_PAIR"
@@ -39,9 +38,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
-
-            # TODO: explain
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "echo $iteration > /tmp/iteration"
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
@@ -52,11 +48,14 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                                 with ${PARALLEL_CLIENTS} parallel clients, \
                                 payload repeat count ${PAYLOAD_REPEAT_COUNT}, \
                                 requests per client ${REQUESTS_PER_CLIENT}..."
+                                (
+                                    set -o xtrace
             tcp-echo-server-test-client \
                 --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \
                 --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+                                )
 
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
