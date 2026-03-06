@@ -7,12 +7,18 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
+	"image/png"
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -162,6 +168,11 @@ func main() {
 		os.Stderr.WriteString("failed to compute p50: " + err.Error() + "\n")
 		os.Exit(1)
 	}
+	p90, err := percentileLatency(allLatencies, 0.90)
+	if err != nil {
+		os.Stderr.WriteString("failed to compute p90: " + err.Error() + "\n")
+		os.Exit(1)
+	}
 	p99, err := percentileLatency(allLatencies, 0.99)
 	if err != nil {
 		os.Stderr.WriteString("failed to compute p99: " + err.Error() + "\n")
@@ -173,7 +184,145 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("requests=%d avg=%s p50=%s p99=%s p999=%s\n", len(allLatencies), avg, p50, p99, p999)
+	histogramPath, err := writeLatencyHistogramPNG(allLatencies, p50, p90, p99, p999)
+	if err != nil {
+		os.Stderr.WriteString("failed to write latency histogram png: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+
+	fmt.Printf("requests=%d avg=%s p50=%s p90=%s p99=%s p999=%s histogram=%s\n", len(allLatencies), avg, p50, p90, p99, p999, histogramPath)
+}
+
+func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 time.Duration, p99 time.Duration, p999 time.Duration) (string, error) {
+	if len(latencies) == 0 {
+		return "", errors.New("no latencies recorded")
+	}
+
+	const outputDir = "/tmp/echo-server-benchmarks"
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return "", fmt.Errorf("create output directory: %w", err)
+	}
+
+	var suffix [4]byte
+	if _, err := rand.Read(suffix[:]); err != nil {
+		return "", fmt.Errorf("generate random suffix: %w", err)
+	}
+	filename := fmt.Sprintf("latency-hist-%d-%x.png", time.Now().UnixNano(), suffix)
+	outputPath := filepath.Join(outputDir, filename)
+
+	maxLatency := latencies[0]
+	for _, latency := range latencies[1:] {
+		if latency > maxLatency {
+			maxLatency = latency
+		}
+	}
+
+	maxBucketIndex := int(maxLatency / time.Millisecond)
+	bucketCount := maxBucketIndex + 1
+	buckets := make([]int, bucketCount)
+	for _, latency := range latencies {
+		bucket := int(latency / time.Millisecond)
+		if bucket < 0 {
+			bucket = 0
+		}
+		if bucket >= bucketCount {
+			bucket = bucketCount - 1
+		}
+		buckets[bucket]++
+	}
+
+	maxCount := 0
+	for _, count := range buckets {
+		if count > maxCount {
+			maxCount = count
+		}
+	}
+	if maxCount == 0 {
+		maxCount = 1
+	}
+
+	const (
+		width       = 1400
+		height      = 900
+		leftMargin  = 80
+		rightMargin = 40
+		topMargin   = 40
+		botMargin   = 80
+	)
+
+	plotWidth := width - leftMargin - rightMargin
+	plotHeight := height - topMargin - botMargin
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+
+	white := image.NewUniform(color.RGBA{255, 255, 255, 255})
+	plotBg := image.NewUniform(color.RGBA{244, 246, 249, 255})
+	barColor := image.NewUniform(color.RGBA{56, 118, 255, 255})
+	axisColor := image.NewUniform(color.RGBA{20, 20, 20, 255})
+
+	draw.Draw(img, img.Bounds(), white, image.Point{}, draw.Src)
+	draw.Draw(img, image.Rect(leftMargin, topMargin, leftMargin+plotWidth, topMargin+plotHeight), plotBg, image.Point{}, draw.Src)
+
+	for bucket, count := range buckets {
+		if count == 0 {
+			continue
+		}
+		x0 := leftMargin + int(float64(bucket)*float64(plotWidth)/float64(bucketCount))
+		x1 := leftMargin + int(float64(bucket+1)*float64(plotWidth)/float64(bucketCount))
+		if x1 <= x0 {
+			x1 = x0 + 1
+		}
+		if x1 > leftMargin+plotWidth {
+			x1 = leftMargin + plotWidth
+		}
+
+		barHeight := int(float64(count) / float64(maxCount) * float64(plotHeight))
+		y0 := topMargin + plotHeight - barHeight
+		draw.Draw(img, image.Rect(x0, y0, x1, topMargin+plotHeight), barColor, image.Point{}, draw.Src)
+	}
+
+	// Draw axes last so they stay visible over bars.
+	draw.Draw(img, image.Rect(leftMargin-1, topMargin, leftMargin+1, topMargin+plotHeight), axisColor, image.Point{}, draw.Src)
+	draw.Draw(img, image.Rect(leftMargin, topMargin+plotHeight-1, leftMargin+plotWidth, topMargin+plotHeight+1), axisColor, image.Point{}, draw.Src)
+
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p50, color.RGBA{220, 20, 60, 255})
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p90, color.RGBA{255, 140, 0, 255})
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p99, color.RGBA{34, 139, 34, 255})
+	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p999, color.RGBA{148, 0, 211, 255})
+
+	f, err := os.Create(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("create output file: %w", err)
+	}
+	defer f.Close()
+
+	if err := png.Encode(f, img); err != nil {
+		return "", fmt.Errorf("encode png: %w", err)
+	}
+
+	return outputPath, nil
+}
+
+func drawPercentileLine(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, bucketCount int, percentileValue time.Duration, line color.RGBA) {
+	positionMs := float64(percentileValue) / float64(time.Millisecond)
+	if positionMs < 0 {
+		positionMs = 0
+	}
+	if bucketCount <= 0 {
+		return
+	}
+	if positionMs > float64(bucketCount) {
+		positionMs = float64(bucketCount)
+	}
+
+	x := left + int(positionMs/float64(bucketCount)*float64(plotWidth))
+	if x < left {
+		x = left
+	}
+	if x >= left+plotWidth {
+		x = left + plotWidth - 1
+	}
+
+	draw.Draw(img, image.Rect(x-1, top, x+1, top+plotHeight), image.NewUniform(line), image.Point{}, draw.Src)
 }
 
 func averageLatency(latencies []time.Duration) (time.Duration, error) {
