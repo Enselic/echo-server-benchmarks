@@ -285,7 +285,7 @@ func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 
 	draw.Draw(img, image.Rect(leftMargin-1, topMargin, leftMargin+1, topMargin+plotHeight), axisColor, image.Point{}, draw.Src)
 	draw.Draw(img, image.Rect(leftMargin, topMargin+plotHeight-1, leftMargin+plotWidth, topMargin+plotHeight+1), axisColor, image.Point{}, draw.Src)
 	drawXAxisTicks(img, leftMargin, topMargin, plotWidth, plotHeight, maxBucketIndex, axisColor)
-	drawYAxisTicks(img, leftMargin, topMargin, plotWidth, plotHeight, maxCount, axisColor)
+	drawYAxisTicks(img, leftMargin, topMargin, plotHeight, maxCount, axisColor)
 
 	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p50, "P50", color.RGBA{220, 20, 60, 255}, 0)
 	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p90, "P90", color.RGBA{255, 140, 0, 255}, 1)
@@ -328,7 +328,7 @@ func drawXAxisTicks(img *image.RGBA, left int, top int, plotWidth int, plotHeigh
 	}
 }
 
-func drawYAxisTicks(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, maxCount int, axisColor *image.Uniform) {
+func drawYAxisTicks(img *image.RGBA, left int, top int, plotHeight int, maxCount int, axisColor *image.Uniform) {
 	const ticks = 8
 	for i := 0; i <= ticks; i++ {
 		ratio := float64(i) / float64(ticks)
