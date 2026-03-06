@@ -39,6 +39,10 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             SERVER_NAME=$(basename $SERVER)
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
+            # Collect remote system metrics during this benchmark run.
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "lightweight-system-monitor" > "/tmp/${SERVER_NAME}.tsv" &
+            MONITOR_PID=$!
+
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
@@ -54,6 +58,10 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
+
+            # Stop the monitor and flush captured output.
+            kill "${MONITOR_PID}" 2>/dev/null || true
+            wait "${MONITOR_PID}" 2>/dev/null || true
             trap - EXIT
         done
     done
