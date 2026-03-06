@@ -43,11 +43,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
-            # Each pair controls both request count and payload size for a run.
-            echo "${iteration}: Running ${SERVER_NAME} test \
-                                with ${PARALLEL_CLIENTS} parallel clients, \
-                                payload repeat count ${PAYLOAD_REPEAT_COUNT}, \
-                                requests per client ${REQUESTS_PER_CLIENT}..."
                                 (
                                     set -o xtrace
             tcp-echo-server-test-client \
@@ -60,8 +55,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
             trap - EXIT
-
-            iteration=$((iteration + 1))
         done
     done
 done
