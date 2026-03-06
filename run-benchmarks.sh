@@ -48,7 +48,10 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
             # Each pair controls both request count and payload size for a run.
-            echo "${iteration}: Running ${SERVER_NAME} test with ${PARALLEL_CLIENTS} parallel clients, payload repeat count ${PAYLOAD_REPEAT_COUNT}, requests per client ${REQUESTS_PER_CLIENT}..."
+            echo "${iteration}: Running ${SERVER_NAME} test \
+                                with ${PARALLEL_CLIENTS} parallel clients, \
+                                payload repeat count ${PAYLOAD_REPEAT_COUNT}, \
+                                requests per client ${REQUESTS_PER_CLIENT}..."
             tcp-echo-server-test-client \
                 --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \

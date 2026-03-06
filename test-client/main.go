@@ -152,6 +152,16 @@ func main() {
 		allLatencies = append(allLatencies, clientLatencies...)
 	}
 
+	avg, err := averageLatency(allLatencies)
+	if err != nil {
+		os.Stderr.WriteString("failed to compute average latency: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	p50, err := percentileLatency(allLatencies, 0.50)
+	if err != nil {
+		os.Stderr.WriteString("failed to compute p50: " + err.Error() + "\n")
+		os.Exit(1)
+	}
 	p99, err := percentileLatency(allLatencies, 0.99)
 	if err != nil {
 		os.Stderr.WriteString("failed to compute p99: " + err.Error() + "\n")
@@ -163,7 +173,20 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("requests=%d p99=%s p999=%s\n", len(allLatencies), p99, p999)
+	fmt.Printf("requests=%d avg=%s p50=%s p99=%s p999=%s\n", len(allLatencies), avg, p50, p99, p999)
+}
+
+func averageLatency(latencies []time.Duration) (time.Duration, error) {
+	if len(latencies) == 0 {
+		return 0, errors.New("no latencies recorded")
+	}
+
+	var total int64
+	for _, latency := range latencies {
+		total += int64(latency)
+	}
+
+	return time.Duration(total / int64(len(latencies))), nil
 }
 
 func percentileLatency(latencies []time.Duration, percentile float64) (time.Duration, error) {
