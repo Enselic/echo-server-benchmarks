@@ -7,7 +7,7 @@ PARALLEL_CLIENTS_VALUES="700"
 #PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="20000:10 20000:1000"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10"
 #REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10 200:100 20:1000"
 
 REMOTE_PORT=9092
@@ -44,7 +44,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "lightweight-system-monitor" > "${TSV_FILE}" &
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" > "${TSV_FILE}" &
             MONITOR_PID=$!
 
             # Start the server on the remote host
