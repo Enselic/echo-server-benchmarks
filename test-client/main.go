@@ -7,24 +7,18 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"image"
-	"image/color"
-	"image/draw"
-	"image/png"
 	"io"
 	"net"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/alexflint/go-arg"
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 )
 
 type cliArgs struct {
@@ -159,57 +153,35 @@ func main() {
 		allLatencies = append(allLatencies, clientLatencies...)
 	}
 
-	avg, err := averageLatency(allLatencies)
+	stats, err := buildPrometheusLatencyStats(allLatencies)
 	if err != nil {
-		os.Stderr.WriteString("failed to compute average latency: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-	p50, err := percentileLatency(allLatencies, 0.50)
-	if err != nil {
-		os.Stderr.WriteString("failed to compute p50: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-	p90, err := percentileLatency(allLatencies, 0.90)
-	if err != nil {
-		os.Stderr.WriteString("failed to compute p90: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-	p99, err := percentileLatency(allLatencies, 0.99)
-	if err != nil {
-		os.Stderr.WriteString("failed to compute p99: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-	p999, err := percentileLatency(allLatencies, 0.999)
-	if err != nil {
-		os.Stderr.WriteString("failed to compute p999: " + err.Error() + "\n")
+		os.Stderr.WriteString("failed to compute prometheus latency stats: " + err.Error() + "\n")
 		os.Exit(1)
 	}
 
-	histogramPath, err := writeLatencyHistogramPNG(allLatencies, p50, p90, p99, p999)
-	if err != nil {
-		os.Stderr.WriteString("failed to write latency histogram png: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-
-	fmt.Printf("requests=%d avg=%s p50=%s p90=%s p99=%s p999=%s histogram=%s\n", len(allLatencies), avg, p50, p90, p99, p999, histogramPath)
+	fmt.Printf("requests=%d avg=%s p50=%s p90=%s p99=%s p999=%s\n",
+		stats.SampleCount,
+		stats.Average,
+		stats.P50,
+		stats.P90,
+		stats.P99,
+		stats.P999,
+	)
 }
 
-func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 time.Duration, p99 time.Duration, p999 time.Duration) (string, error) {
+type latencyStats struct {
+	SampleCount uint64
+	Average     time.Duration
+	P50         time.Duration
+	P90         time.Duration
+	P99         time.Duration
+	P999        time.Duration
+}
+
+func buildPrometheusLatencyStats(latencies []time.Duration) (latencyStats, error) {
 	if len(latencies) == 0 {
-		return "", errors.New("no latencies recorded")
+		return latencyStats{}, errors.New("no latencies recorded")
 	}
-
-	const outputDir = "/tmp/echo-server-benchmarks"
-	if err := os.MkdirAll(outputDir, 0o755); err != nil {
-		return "", fmt.Errorf("create output directory: %w", err)
-	}
-
-	var suffix [4]byte
-	if _, err := rand.Read(suffix[:]); err != nil {
-		return "", fmt.Errorf("generate random suffix: %w", err)
-	}
-	filename := fmt.Sprintf("latency-hist-%d-%x.png", time.Now().UnixNano(), suffix)
-	outputPath := filepath.Join(outputDir, filename)
 
 	maxLatency := latencies[0]
 	for _, latency := range latencies[1:] {
@@ -217,282 +189,93 @@ func writeLatencyHistogramPNG(latencies []time.Duration, p50 time.Duration, p90 
 			maxLatency = latency
 		}
 	}
+	bucketCount := int(maxLatency/time.Millisecond) + 1
 
-	maxBucketIndex := int(maxLatency / time.Millisecond)
-	bucketCount := maxBucketIndex + 1
-	buckets := make([]int, bucketCount)
+	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Name:    "benchmark_latency_seconds",
+		Help:    "Request latency distribution in seconds",
+		Buckets: prometheus.LinearBuckets(0.001, 0.001, bucketCount),
+	})
+
+	summary := prometheus.NewSummary(prometheus.SummaryOpts{
+		Name: "benchmark_latency_summary_seconds",
+		Help: "Request latency quantiles in seconds",
+		Objectives: map[float64]float64{
+			0.50: 0.001,
+			0.90: 0.001,
+			0.99: 0.001,
+			0.999: 0.001,
+		},
+	})
+
 	for _, latency := range latencies {
-		bucket := int(latency / time.Millisecond)
-		if bucket < 0 {
-			bucket = 0
-		}
-		if bucket >= bucketCount {
-			bucket = bucketCount - 1
-		}
-		buckets[bucket]++
+		seconds := float64(latency) / float64(time.Second)
+		histogram.Observe(seconds)
+		summary.Observe(seconds)
 	}
 
-	maxCount := 0
-	for _, count := range buckets {
-		if count > maxCount {
-			maxCount = count
-		}
+	hMetric := &dto.Metric{}
+	if err := histogram.Write(hMetric); err != nil {
+		return latencyStats{}, fmt.Errorf("write histogram metric: %w", err)
 	}
-	if maxCount == 0 {
-		maxCount = 1
-	}
-
-	const (
-		width       = 1400
-		height      = 900
-		leftMargin  = 80
-		rightMargin = 40
-		topMargin   = 40
-		botMargin   = 80
-	)
-
-	plotWidth := width - leftMargin - rightMargin
-	plotHeight := height - topMargin - botMargin
-	img := image.NewRGBA(image.Rect(0, 0, width, height))
-
-	white := image.NewUniform(color.RGBA{255, 255, 255, 255})
-	plotBg := image.NewUniform(color.RGBA{244, 246, 249, 255})
-	barColor := image.NewUniform(color.RGBA{56, 118, 255, 255})
-	axisColor := image.NewUniform(color.RGBA{20, 20, 20, 255})
-
-	draw.Draw(img, img.Bounds(), white, image.Point{}, draw.Src)
-	draw.Draw(img, image.Rect(leftMargin, topMargin, leftMargin+plotWidth, topMargin+plotHeight), plotBg, image.Point{}, draw.Src)
-
-	for bucket, count := range buckets {
-		if count == 0 {
-			continue
-		}
-		x0 := leftMargin + int(float64(bucket)*float64(plotWidth)/float64(bucketCount))
-		x1 := leftMargin + int(float64(bucket+1)*float64(plotWidth)/float64(bucketCount))
-		if x1 <= x0 {
-			x1 = x0 + 1
-		}
-		if x1 > leftMargin+plotWidth {
-			x1 = leftMargin + plotWidth
-		}
-
-		barHeight := int(float64(count) / float64(maxCount) * float64(plotHeight))
-		y0 := topMargin + plotHeight - barHeight
-		draw.Draw(img, image.Rect(x0, y0, x1, topMargin+plotHeight), barColor, image.Point{}, draw.Src)
+	sMetric := &dto.Metric{}
+	if err := summary.Write(sMetric); err != nil {
+		return latencyStats{}, fmt.Errorf("write summary metric: %w", err)
 	}
 
-	// Draw axes last so they stay visible over bars.
-	draw.Draw(img, image.Rect(leftMargin-1, topMargin, leftMargin+1, topMargin+plotHeight), axisColor, image.Point{}, draw.Src)
-	draw.Draw(img, image.Rect(leftMargin, topMargin+plotHeight-1, leftMargin+plotWidth, topMargin+plotHeight+1), axisColor, image.Point{}, draw.Src)
-	drawXAxisTicks(img, leftMargin, topMargin, plotWidth, plotHeight, maxBucketIndex, axisColor)
-	drawYAxisTicks(img, leftMargin, topMargin, plotHeight, maxCount, axisColor)
-
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p50, "P50", color.RGBA{220, 20, 60, 255}, 0)
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p90, "P90", color.RGBA{255, 140, 0, 255}, 1)
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p99, "P99", color.RGBA{34, 139, 34, 255}, 2)
-	drawPercentileLine(img, leftMargin, topMargin, plotWidth, plotHeight, bucketCount, p999, "P999", color.RGBA{148, 0, 211, 255}, 3)
-
-	labelColor := color.RGBA{20, 20, 20, 255}
-	drawText(img, leftMargin+6, topMargin-22, "Y: COUNT (REQUESTS)", labelColor, 2)
-	drawText(img, leftMargin+plotWidth/2-120, topMargin+plotHeight+18, "X: LATENCY (MS)", labelColor, 2)
-
-	f, err := os.Create(outputPath)
-	if err != nil {
-		return "", fmt.Errorf("create output file: %w", err)
-	}
-	defer f.Close()
-
-	if err := png.Encode(f, img); err != nil {
-		return "", fmt.Errorf("encode png: %w", err)
+	summaryData := sMetric.GetSummary()
+	sampleCount := summaryData.GetSampleCount()
+	if sampleCount == 0 {
+		return latencyStats{}, errors.New("summary has zero samples")
 	}
 
-	return outputPath, nil
+	avg := time.Duration(summaryData.GetSampleSum()/float64(sampleCount) * float64(time.Second))
+
+	quantiles := map[float64]time.Duration{}
+	for _, q := range summaryData.GetQuantile() {
+		value := time.Duration(q.GetValue() * float64(time.Second))
+		quantiles[q.GetQuantile()] = value
+	}
+
+	p50, ok := findQuantile(quantiles, 0.50)
+	if !ok {
+		return latencyStats{}, errors.New("missing p50 quantile")
+	}
+	p90, ok := findQuantile(quantiles, 0.90)
+	if !ok {
+		return latencyStats{}, errors.New("missing p90 quantile")
+	}
+	p99, ok := findQuantile(quantiles, 0.99)
+	if !ok {
+		return latencyStats{}, errors.New("missing p99 quantile")
+	}
+	p999, ok := findQuantile(quantiles, 0.999)
+	if !ok {
+		return latencyStats{}, errors.New("missing p999 quantile")
+	}
+
+	return latencyStats{
+		SampleCount: sampleCount,
+		Average:     avg,
+		P50:         p50,
+		P90:         p90,
+		P99:         p99,
+		P999:        p999,
+	}, nil
 }
 
-func drawXAxisTicks(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, maxBucketIndex int, axisColor *image.Uniform) {
-	const ticks = 10
-	for i := 0; i <= ticks; i++ {
-		ratio := float64(i) / float64(ticks)
-		x := left + int(ratio*float64(plotWidth))
-		if x >= left+plotWidth {
-			x = left + plotWidth - 1
+func findQuantile(values map[float64]time.Duration, target float64) (time.Duration, bool) {
+	const eps = 0.0000001
+	for q, value := range values {
+		delta := q - target
+		if delta < 0 {
+			delta = -delta
 		}
-
-		// Tick mark.
-		draw.Draw(img, image.Rect(x, top+plotHeight-1, x+1, top+plotHeight+8), axisColor, image.Point{}, draw.Src)
-
-		valueMs := int(ratio * float64(maxBucketIndex))
-		label := fmt.Sprintf("%d", valueMs)
-		labelWidth := textPixelWidth(label, 2)
-		drawText(img, x-labelWidth/2, top+plotHeight+10, label, color.RGBA{20, 20, 20, 255}, 2)
-	}
-}
-
-func drawYAxisTicks(img *image.RGBA, left int, top int, plotHeight int, maxCount int, axisColor *image.Uniform) {
-	const ticks = 8
-	for i := 0; i <= ticks; i++ {
-		ratio := float64(i) / float64(ticks)
-		y := top + plotHeight - int(ratio*float64(plotHeight))
-		if y < top {
-			y = top
-		}
-		if y >= top+plotHeight {
-			y = top + plotHeight - 1
-		}
-
-		// Tick mark.
-		draw.Draw(img, image.Rect(left-8, y, left+1, y+1), axisColor, image.Point{}, draw.Src)
-
-		value := int(ratio * float64(maxCount))
-		label := fmt.Sprintf("%d", value)
-		labelWidth := textPixelWidth(label, 2)
-		drawText(img, left-12-labelWidth, y-7, label, color.RGBA{20, 20, 20, 255}, 2)
-	}
-}
-
-func drawPercentileLine(img *image.RGBA, left int, top int, plotWidth int, plotHeight int, bucketCount int, percentileValue time.Duration, label string, line color.RGBA, labelRow int) {
-	positionMs := float64(percentileValue) / float64(time.Millisecond)
-	if positionMs < 0 {
-		positionMs = 0
-	}
-	if bucketCount <= 0 {
-		return
-	}
-	if positionMs > float64(bucketCount) {
-		positionMs = float64(bucketCount)
-	}
-
-	x := left + int(positionMs/float64(bucketCount)*float64(plotWidth))
-	if x < left {
-		x = left
-	}
-	if x >= left+plotWidth {
-		x = left + plotWidth - 1
-	}
-
-	draw.Draw(img, image.Rect(x-1, top, x+1, top+plotHeight), image.NewUniform(line), image.Point{}, draw.Src)
-
-	text := fmt.Sprintf("%s=%s", label, formatDurationMillis(percentileValue))
-	textWidth := textPixelWidth(text, 2)
-	textX := x + 6
-	if textX+textWidth > left+plotWidth-4 {
-		textX = x - 6 - textWidth
-	}
-	if textX < left+4 {
-		textX = left + 4
-	}
-	textY := top + 6 + labelRow*20
-	drawText(img, textX, textY, text, line, 2)
-}
-
-func formatDurationMillis(d time.Duration) string {
-	return strings.ToUpper(fmt.Sprintf("%.3fms", float64(d)/float64(time.Millisecond)))
-}
-
-func drawText(img *image.RGBA, x int, y int, text string, c color.RGBA, scale int) {
-	if scale < 1 {
-		scale = 1
-	}
-	cursorX := x
-	for _, raw := range strings.ToUpper(text) {
-		glyph, ok := bitmapFont5x7[raw]
-		if !ok {
-			glyph = bitmapFont5x7['?']
-		}
-		drawGlyph(img, cursorX, y, glyph, c, scale)
-		cursorX += (5+1)*scale
-	}
-}
-
-func textPixelWidth(text string, scale int) int {
-	if scale < 1 {
-		scale = 1
-	}
-	return len([]rune(text)) * (5 + 1) * scale
-}
-
-func drawGlyph(img *image.RGBA, x int, y int, rows [7]string, c color.RGBA, scale int) {
-	for rowIdx, row := range rows {
-		for colIdx, cell := range row {
-			if cell != '#' {
-				continue
-			}
-			x0 := x + colIdx*scale
-			y0 := y + rowIdx*scale
-			draw.Draw(img, image.Rect(x0, y0, x0+scale, y0+scale), image.NewUniform(c), image.Point{}, draw.Src)
+		if delta <= eps {
+			return value, true
 		}
 	}
-}
-
-var bitmapFont5x7 = map[rune][7]string{
-	' ': {".....", ".....", ".....", ".....", ".....", ".....", "....."},
-	'(': {"..##.", ".##..", ".#...", ".#...", ".#...", ".##..", "..##."},
-	')': {".##..", "..##.", "...#.", "...#.", "...#.", "..##.", ".##.."},
-	'.': {".....", ".....", ".....", ".....", ".....", ".##..", ".##.."},
-	'0': {".###.", "#...#", "#..##", "#.#.#", "##..#", "#...#", ".###."},
-	'1': {"..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."},
-	'2': {".###.", "#...#", "....#", "...#.", "..#..", ".#...", "#####"},
-	'3': {"####.", "....#", "...#.", "..##.", "....#", "#...#", ".###."},
-	'4': {"...#.", "..##.", ".#.#.", "#..#.", "#####", "...#.", "...#."},
-	'5': {"#####", "#....", "####.", "....#", "....#", "#...#", ".###."},
-	'6': {".###.", "#....", "#....", "####.", "#...#", "#...#", ".###."},
-	'7': {"#####", "....#", "...#.", "..#..", ".#...", ".#...", ".#..."},
-	'8': {".###.", "#...#", "#...#", ".###.", "#...#", "#...#", ".###."},
-	'9': {".###.", "#...#", "#...#", ".####", "....#", "....#", ".###."},
-	':': {".....", ".##..", ".##..", ".....", ".##..", ".##..", "....."},
-	'=': {".....", "#####", ".....", "#####", ".....", ".....", "....."},
-	'?': {".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."},
-	'A': {".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"},
-	'C': {".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."},
-	'E': {"#####", "#....", "#....", "#####", "#....", "#....", "#####"},
-	'L': {"#....", "#....", "#....", "#....", "#....", "#....", "#####"},
-	'M': {"#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"},
-	'N': {"#...#", "##..#", "#.#.#", "#..##", "#...#", "#...#", "#...#"},
-	'O': {".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."},
-	'P': {"####.", "#...#", "#...#", "####.", "#....", "#....", "#...."},
-	'Q': {".###.", "#...#", "#...#", "#...#", "#.#.#", "#..#.", ".##.#"},
-	'R': {"####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"},
-	'S': {".####", "#....", "#....", ".###.", "....#", "....#", "####."},
-	'T': {"#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."},
-	'U': {"#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."},
-	'X': {"#...#", "#...#", ".#.#.", "..#..", ".#.#.", "#...#", "#...#"},
-	'Y': {"#...#", "#...#", ".#.#.", "..#..", "..#..", "..#..", "..#.."},
-}
-
-func averageLatency(latencies []time.Duration) (time.Duration, error) {
-	if len(latencies) == 0 {
-		return 0, errors.New("no latencies recorded")
-	}
-
-	var total int64
-	for _, latency := range latencies {
-		total += int64(latency)
-	}
-
-	return time.Duration(total / int64(len(latencies))), nil
-}
-
-func percentileLatency(latencies []time.Duration, percentile float64) (time.Duration, error) {
-	if len(latencies) == 0 {
-		return 0, errors.New("no latencies recorded")
-	}
-	if percentile <= 0 || percentile > 1 {
-		return 0, errors.New("percentile must be in the interval (0, 1]")
-	}
-
-	sorted := make([]time.Duration, len(latencies))
-	copy(sorted, latencies)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-
-	idx := int(percentile*float64(len(sorted))+0.999999999) - 1
-	if idx < 0 {
-		idx = 0
-	}
-	if idx >= len(sorted) {
-		idx = len(sorted) - 1
-	}
-
-	return sorted[idx], nil
+	return 0, false
 }
 
 func waitForAddrWithTimeout(addr string, timeout time.Duration) error {
