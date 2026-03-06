@@ -33,7 +33,7 @@ PATH="$SCRIPT_DIR/build:$PATH"
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
-        IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<< "$REQUEST_PAYLOAD_PAIR"
+        IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<<"$REQUEST_PAYLOAD_PAIR"
 
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
@@ -43,14 +43,14 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
-                                (
-                                    set -o xtrace
-            tcp-echo-server-test-client \
-                --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
-                --parallel-clients ${PARALLEL_CLIENTS} \
-                --requests-per-client ${REQUESTS_PER_CLIENT} \
-                --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
-                                )
+            (
+                set -o xtrace
+                tcp-echo-server-test-client \
+                    --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
+                    --parallel-clients ${PARALLEL_CLIENTS} \
+                    --requests-per-client ${REQUESTS_PER_CLIENT} \
+                    --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+            )
 
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
