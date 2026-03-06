@@ -1,4 +1,9 @@
-set term qt size 1400,800 noenhanced
+if (exists("outputfile")) {
+     set term pngcairo size 1400,800 noenhanced
+     set output outputfile
+} else {
+     set term qt size 1400,800 noenhanced
+}
 set datafile separator "\t"
 set decimalsign ","
 
@@ -17,12 +22,10 @@ set y2tics
 set yrange [0:*]
 set y2range [*:*]
 
-# How often to refresh (seconds)
-refresh = 0.5
-
 # datafile must be passed via -e "datafile='...'"
 plot datafile using 1:2 with lines lw 2 title "CPU‰", \
      ''       using 1:3 axes x1y2 with lines lw 2 title "Avail_kB"
 
-
-pause -1
+if (!exists("outputfile")) {
+     pause -1
+}

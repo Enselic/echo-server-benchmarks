@@ -11,6 +11,7 @@ REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="20000:10 20000:1000"
 #REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10 200:100 20:1000"
 
 REMOTE_PORT=9092
+MONITOR_OUTPUT_DIR="/tmp/echo-server-benchmarks"
 
 # First deploy servers
 # if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
@@ -30,6 +31,7 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 echo "Building tcp-echo-server-test-client..."
 (cd "$SCRIPT_DIR/test-client" && go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" .)
 PATH="$SCRIPT_DIR/build:$PATH"
+mkdir -p "${MONITOR_OUTPUT_DIR}"
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
@@ -37,10 +39,12 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
+            TSV_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.tsv"
+            PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.png"
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "lightweight-system-monitor" > "/tmp/${SERVER_NAME}.tsv" &
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "lightweight-system-monitor" > "${TSV_FILE}" &
             MONITOR_PID=$!
 
             # Start the server on the remote host
@@ -62,6 +66,12 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # Stop the monitor and flush captured output.
             kill "${MONITOR_PID}" 2>/dev/null || true
             wait "${MONITOR_PID}" 2>/dev/null || true
+
+            # Render a PNG snapshot from the captured metrics.
+            gnuplot \
+                -e "datafile='${TSV_FILE}'" \
+                -e "outputfile='${PNG_FILE}'" \
+                "${SCRIPT_DIR}/presentation/visualize.gnuplot"
             trap - EXIT
         done
     done
