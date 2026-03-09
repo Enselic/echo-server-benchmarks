@@ -1,5 +1,7 @@
 use clap::Parser;
 use std::error::Error;
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -22,6 +24,9 @@ struct CliArgs {
 
     #[arg(short = 'd', long = "debug")]
     debug: bool,
+
+    #[arg(long = "latency-ms-file")]
+    latency_ms_file: Option<String>,
 }
 
 fn make_payload_unit(client_id: u64, seq: u64) -> [u8; 16] {
@@ -234,6 +239,16 @@ async fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
     let p90 = quantile_from_sorted(&all_latencies, 0.90);
     let p99 = quantile_from_sorted(&all_latencies, 0.99);
     let p999 = quantile_from_sorted(&all_latencies, 0.999);
+
+    if let Some(path) = &args.latency_ms_file {
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
+        for latency in &all_latencies {
+            // One latency in milliseconds per line for downstream plotting.
+            writeln!(writer, "{:.6}", latency.as_secs_f64() * 1_000.0)?;
+        }
+        writer.flush()?;
+    }
 
     println!("requests={} avg={}", all_latencies.len(), format_duration(avg));
     print_latency_histogram(&all_latencies);

@@ -43,6 +43,8 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             SERVER_NAME=$(basename $SERVER)
             TSV_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.tsv"
             PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.png"
+            LATENCY_MS_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.latency-ms.tsv"
+            LATENCY_PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.latency-hist.png"
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
@@ -60,7 +62,8 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                     --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                     --parallel-clients ${PARALLEL_CLIENTS} \
                     --requests-per-client ${REQUESTS_PER_CLIENT} \
-                    --payload-repeat-count ${PAYLOAD_REPEAT_COUNT}
+                    --payload-repeat-count ${PAYLOAD_REPEAT_COUNT} \
+                    --latency-ms-file "${LATENCY_MS_FILE}"
             )
 
             # Stop the server
@@ -75,6 +78,13 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                 -e "datafile='${TSV_FILE}'" \
                 -e "outputfile='${PNG_FILE}'" \
                 "${SCRIPT_DIR}/presentation/visualize.gnuplot"
+
+            # Render per-server request latency histogram with fixed 10ms buckets.
+            gnuplot \
+                -e "datafile='${LATENCY_MS_FILE}'" \
+                -e "outputfile='${LATENCY_PNG_FILE}'" \
+                -e "title='${SERVER_NAME} latency histogram (10ms buckets)'" \
+                "${SCRIPT_DIR}/presentation/latency-histogram.gnuplot"
             trap - EXIT
         done
     done
