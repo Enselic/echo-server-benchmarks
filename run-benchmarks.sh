@@ -11,7 +11,8 @@ REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="200:10"
 #REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10 200:100 20:1000"
 
 REMOTE_PORT=9092
-MONITOR_OUTPUT_DIR="/tmp/echo-server-benchmarks"
+RUN_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
+MONITOR_OUTPUT_DIR="/tmp/echo-server-benchmarks-${RUN_TIMESTAMP}"
 
 # First deploy servers
 # if [ "$REMOTE_HOST" = "" ] || [ "$REMOTE_USER" = "" ]; then
