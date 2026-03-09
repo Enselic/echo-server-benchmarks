@@ -29,7 +29,8 @@ ulimit -n $(cat /proc/sys/fs/nr_open)
 # done
 # Build test client from source
 echo "Building tcp-echo-server-test-client..."
-(cd "$SCRIPT_DIR/test-client" && go build -o "$SCRIPT_DIR/build/tcp-echo-server-test-client" .)
+(cd "$SCRIPT_DIR/test-client" && cargo build --release)
+cp "$SCRIPT_DIR/test-client/target/release/tcp-echo-server-test-client" "$SCRIPT_DIR/build/tcp-echo-server-test-client"
 PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
