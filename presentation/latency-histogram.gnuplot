@@ -10,12 +10,14 @@ set datafile separator "\t"
 set title exists("title") ? title : "Latency Histogram"
 set xlabel "Latency (ms)"
 set ylabel "Requests"
+set xrange [0:300]
 set grid
 set key off
 
 # Fixed histogram bucket width requested by benchmark configuration.
 binwidth = 10.0
-bin(x, w) = w * floor(x / w)
+max_latency = 300.0
+bin(x, w) = w * floor((x >= max_latency ? (max_latency - 1e-9) : x) / w)
 
 # Compute percentiles from the first column of the input data.
 percentile(p) = real(word(system(sprintf("sort -n -k1,1 '%s' | awk 'BEGIN{pct=%f} {v[NR]=$1} END{if(NR==0){print \"NaN\"; exit} idx=int((NR-1)*pct+1); if(idx<1) idx=1; if(idx>NR) idx=NR; print v[idx]}'", datafile, p)), 1))
