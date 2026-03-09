@@ -18,15 +18,9 @@ set ylabel "CPU%"
 set y2label "Avail_MB"
 set y2tics
 
-# Compute memory stats first (in MB), then keep a fixed 30 MB span on y2.
-stats datafile using ($3/1024.0) name "MEM" nooutput
-if (exists("MEM_min") && exists("MEM_max")) {
-     mem_mid = (MEM_min + MEM_max) / 2.0
-     set y2range [mem_mid - 15.0:mem_mid + 15.0]
-} else {
-     # Fallback if data is empty/unreadable.
-     set y2range [0:30]
-}
+# Show full Avail_MB range from the data.
+set autoscale y2
+set y2range [*:*]
 
 # Fix CPU to percent scale.
 set yrange [0:100]
