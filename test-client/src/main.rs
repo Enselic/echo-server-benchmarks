@@ -77,11 +77,14 @@ async fn wait_for_addr_with_timeout(
     let started = Instant::now();
 
     loop {
-        if timeout(Duration::from_secs(2), TcpStream::connect(addr))
-            .await
-            .is_ok()
-        {
-            return Ok(());
+        match timeout(Duration::from_secs(2), TcpStream::connect(addr)).await {
+            Ok(Ok(conn)) => {
+                drop(conn);
+                return Ok(());
+            }
+            Ok(Err(_)) | Err(_) => {
+                // Keep retrying until total timeout is reached.
+            }
         }
 
         if started.elapsed() >= total_timeout {

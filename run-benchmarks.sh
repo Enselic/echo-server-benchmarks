@@ -50,6 +50,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
+
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
             (
