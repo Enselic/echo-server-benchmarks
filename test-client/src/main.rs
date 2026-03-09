@@ -100,80 +100,6 @@ async fn wait_for_addr_with_timeout(
     }
 }
 
-fn quantile_from_sorted(sorted: &[Duration], q: f64) -> Duration {
-    if sorted.is_empty() {
-        return Duration::from_secs(0);
-    }
-
-    let n = sorted.len();
-    let rank = (q * n as f64).ceil() as usize;
-    let idx = rank.saturating_sub(1).min(n - 1);
-    sorted[idx]
-}
-
-fn average_duration(values: &[Duration]) -> Duration {
-    let total_nanos: u128 = values.iter().map(Duration::as_nanos).sum();
-    let avg_nanos = total_nanos / values.len() as u128;
-    Duration::from_nanos(avg_nanos as u64)
-}
-
-fn format_duration(d: Duration) -> String {
-    if d.as_secs_f64() >= 1.0 {
-        format!("{:.3}s", d.as_secs_f64())
-    } else if d.as_millis() > 0 {
-        format!("{:.3}ms", d.as_secs_f64() * 1_000.0)
-    } else {
-        format!("{:.3}us", d.as_secs_f64() * 1_000_000.0)
-    }
-}
-
-fn print_latency_histogram(sorted: &[Duration]) {
-    let values_us: Vec<u64> = sorted
-        .iter()
-        .map(|d| {
-            let us = d.as_micros();
-            if us > u64::MAX as u128 {
-                u64::MAX
-            } else {
-                us as u64
-            }
-        })
-        .collect();
-
-    let min_us = values_us[0];
-    let max_us = *values_us.last().unwrap_or(&min_us);
-    let bucket_count: usize = 20;
-
-    let range = max_us.saturating_sub(min_us).saturating_add(1);
-    let bucket_size = (range + bucket_count as u64 - 1) / bucket_count as u64;
-    let mut counts = vec![0_usize; bucket_count];
-
-    for us in values_us {
-        let idx = ((us.saturating_sub(min_us)) / bucket_size) as usize;
-        counts[idx.min(bucket_count - 1)] += 1;
-    }
-
-    let max_count = *counts.iter().max().unwrap_or(&1);
-    println!("latency histogram (microsecond buckets):");
-    for (i, count) in counts.iter().enumerate() {
-        let low = min_us + i as u64 * bucket_size;
-        let high = low.saturating_add(bucket_size.saturating_sub(1));
-        let bar_len = if max_count == 0 {
-            0
-        } else {
-            (*count * 40 + max_count - 1) / max_count
-        };
-        let bar = "#".repeat(bar_len);
-        println!(
-            "  {:>10} - {:>10} | {:>6} | {}",
-            format_duration(Duration::from_micros(low)),
-            format_duration(Duration::from_micros(high)),
-            count,
-            bar
-        );
-    }
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     if let Err(err) = run().await {
@@ -234,12 +160,6 @@ async fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     all_latencies.sort_unstable();
 
-    let avg = average_duration(&all_latencies);
-    let p50 = quantile_from_sorted(&all_latencies, 0.50);
-    let p90 = quantile_from_sorted(&all_latencies, 0.90);
-    let p99 = quantile_from_sorted(&all_latencies, 0.99);
-    let p999 = quantile_from_sorted(&all_latencies, 0.999);
-
     if let Some(path) = &args.latency_ms_file {
         let file = File::create(path)?;
         let mut writer = BufWriter::new(file);
@@ -249,14 +169,6 @@ async fn run() -> Result<(), Box<dyn Error + Send + Sync>> {
         }
         writer.flush()?;
     }
-
-    println!("requests={} avg={}", all_latencies.len(), format_duration(avg));
-    print_latency_histogram(&all_latencies);
-    println!("percentiles:");
-    println!("  p50  {}", format_duration(p50));
-    println!("  p90  {}", format_duration(p90));
-    println!("  p99  {}", format_duration(p99));
-    println!("  p999 {}", format_duration(p999));
 
     Ok(())
 }
