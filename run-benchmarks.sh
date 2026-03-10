@@ -51,6 +51,9 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" > "${TSV_FILE}" &
             MONITOR_PID=$!
 
+            # Let system metrics stabalize before starting the server and client.
+            sleep 5
+
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
 
@@ -69,6 +72,9 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
+            # Let system metrics stabalize before stopping monitoring.
+            sleep 5
+
             # Stop the monitor and flush captured output.
             kill "${MONITOR_PID}" 2>/dev/null || true
             wait "${MONITOR_PID}" 2>/dev/null || true
@@ -79,7 +85,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                 -e "outputfile='${PNG_FILE}'" \
                 "${SCRIPT_DIR}/presentation/visualize.gnuplot"
 
-            # Render per-server request latency histogram with fixed 10ms buckets.
+            # Render per-server request latency histogram
             gnuplot \
                 -e "datafile='${LATENCY_MS_FILE}'" \
                 -e "outputfile='${LATENCY_PNG_FILE}'" \
@@ -91,3 +97,5 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 done
 
 echo "All benchmarks completed successfully! See $MONITOR_OUTPUT_DIR for results."
+
+winopen "${MONITOR_OUTPUT_DIR}"

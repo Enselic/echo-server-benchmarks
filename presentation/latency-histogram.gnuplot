@@ -10,13 +10,13 @@ set datafile separator "\t"
 set title exists("title") ? title : "Latency Histogram"
 set xlabel "Latency (ms)"
 set ylabel "Requests"
-set xrange [0:300]
+max_latency = 150.0
+set xrange [0:max_latency]
 set grid
 set key off
 
 # Fixed histogram bucket width requested by benchmark configuration.
-binwidth = 10.0
-max_latency = 300.0
+binwidth = 1.0
 bin(x, w) = w * floor((x >= max_latency ? (max_latency - 1e-9) : x) / w)
 
 # Compute percentiles from the first column of the input data.
