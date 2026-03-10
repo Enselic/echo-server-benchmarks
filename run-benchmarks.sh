@@ -97,4 +97,8 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     done
 done
 
-echo "All benchmarks completed successfully! See file://wsl.localhost/Ubuntu-24.04/$MONITOR_OUTPUT_DIR for results."
+echo "All benchmarks completed successfully! See
+
+    file://wsl.localhost/Ubuntu-24.04/$MONITOR_OUTPUT_DIR
+
+for results."
