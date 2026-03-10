@@ -3,11 +3,11 @@ set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="100 200 300 400 500"
+PARALLEL_CLIENTS_VALUES="100" # 200 300 400 500"
 #PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="1000:10"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="10000:10"
 #REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10 200:100 20:1000"
 
 REMOTE_PORT=9092
@@ -97,6 +97,4 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     done
 done
 
-echo "All benchmarks completed successfully! See $MONITOR_OUTPUT_DIR for results."
-
-winopen "${MONITOR_OUTPUT_DIR}"
+echo "All benchmarks completed successfully! See file://wsl.localhost/Ubuntu-24.04/$MONITOR_OUTPUT_DIR for results."
