@@ -3,11 +3,11 @@ set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="700"
+PARALLEL_CLIENTS_VALUES="100 200 300 400 500"
 #PARALLEL_CLIENTS_VALUES="100 700 1500"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="5000:10"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="1000:10"
 #REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="2000:10 200:100 20:1000"
 
 REMOTE_PORT=9092
@@ -41,14 +41,15 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
-            TSV_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.tsv"
-            PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.png"
-            LATENCY_MS_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.latency-ms.tsv"
-            LATENCY_PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.latency-hist.png"
+            BENCHMARK_SUFFIX="pc${PARALLEL_CLIENTS}-rpc${REQUESTS_PER_CLIENT}-prc${PAYLOAD_REPEAT_COUNT}"
+            TSV_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.tsv"
+            PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.png"
+            LATENCY_MS_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.latency-ms.tsv"
+            LATENCY_PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.latency-hist.png"
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" > "${TSV_FILE}" &
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" "--mem-available-baseline-kb" "6900000" > "${TSV_FILE}" &
             MONITOR_PID=$!
 
             # Let system metrics stabalize before starting the server and client.
