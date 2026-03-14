@@ -10,7 +10,14 @@ set datafile separator "\t"
 set title exists("title") ? title : "Latency Histogram"
 set xlabel "Latency (ms)"
 set ylabel "Requests"
-max_latency = 30.0
+if (!exists("max_latency")) {
+    stats datafile using 1 nooutput
+    if (STATS_records > 0) {
+        max_latency = (STATS_max > int(STATS_max)) ? (int(STATS_max) + 1.0) : STATS_max
+    } else {
+        max_latency = 1.0
+    }
+}
 set xrange [0:max_latency]
 set grid
 set key off
