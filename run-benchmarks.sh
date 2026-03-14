@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARALLEL_CLIENTS_VALUES="200"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="1000:1"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="100:1"
 
 REMOTE_PORT=9092
 RUN_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -130,6 +130,54 @@ html_escape() {
                 -e "s/'/\&#39;/g"
 }
 
+benchmark_suffix_from_png() {
+    local png_file_name base_name normalized_name
+
+    png_file_name="$1"
+    base_name="${png_file_name%.png}"
+    normalized_name="${base_name%.latency-hist}"
+
+    printf '%s\n' "${normalized_name##*.}"
+}
+
+benchmark_header_from_suffix() {
+    local suffix part parallel_clients requests_per_client payload_repeat_count
+
+    suffix="$1"
+
+    for part in ${suffix//-/ }; do
+        case "$part" in
+            pc*) parallel_clients="${part#pc}" ;;
+            rpc*) requests_per_client="${part#rpc}" ;;
+            prc*) payload_repeat_count="${part#prc}" ;;
+        esac
+    done
+
+    printf 'Parallel clients: %s | Requests per client: %s | Payload repeat count: %s\n' \
+        "${parallel_clients:-unknown}" \
+        "${requests_per_client:-unknown}" \
+        "${payload_repeat_count:-unknown}"
+}
+
+image_title_from_png() {
+    local png_file_name base_name normalized_name chart_label server_name title
+
+    png_file_name="$1"
+    base_name="${png_file_name%.png}"
+    chart_label="System metrics"
+    normalized_name="$base_name"
+
+    if [[ "$base_name" == *.latency-hist ]]; then
+        chart_label="Latency histogram"
+        normalized_name="${base_name%.latency-hist}"
+    fi
+
+    server_name="${normalized_name%.*}"
+    title="$(printf '%s' "${server_name}" | tr '._-' '   ' | sed 's/[[:space:]]\+/ /g; s/^ //; s/ $//')"
+
+    printf '%s (%s)\n' "${title}" "${chart_label}"
+}
+
 {
         cat <<'HTML_HEAD'
 <!doctype html>
@@ -166,9 +214,31 @@ html_escape() {
             margin: 0 0 20px;
             color: var(--muted);
         }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        .groups {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+        .group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .group-header {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 16px 18px;
+        }
+        .group-title {
+            margin: 0;
+            font-size: 1.05rem;
+            line-height: 1.4;
+        }
+        .image-list {
+            display: flex;
+            flex-direction: column;
             gap: 18px;
         }
         .card {
@@ -197,8 +267,8 @@ html_escape() {
             main {
                 padding: 14px;
             }
-            .grid {
-                grid-template-columns: 1fr;
+            .group-header {
+            padding: 14px;
             }
         }
     </style>
@@ -206,22 +276,48 @@ html_escape() {
 <body>
     <main>
         <h1>Echo Server Benchmark Overview</h1>
-        <p>Generated from all PNG artifacts in this directory.</p>
-        <section class="grid">
+        <p>Generated from all PNG artifacts in this directory, grouped by benchmark parameters.</p>
+        <section class="groups">
 HTML_HEAD
 
-        while IFS= read -r -d '' PNG_PATH; do
-                PNG_FILE_NAME="$(basename "${PNG_PATH}")"
-                TITLE="${PNG_FILE_NAME%.png}"
-                TITLE="$(printf '%s' "${TITLE}" | tr '._' '  ' | sed 's/[[:space:]]\+/ /g')"
-                SAFE_TITLE="$(printf '%s' "${TITLE}" | html_escape)"
-                SAFE_FILE_NAME="$(printf '%s' "${PNG_FILE_NAME}" | html_escape)"
+        CURRENT_SUFFIX=""
+        while IFS=$'\t' read -r BENCHMARK_SUFFIX PNG_FILE_NAME; do
+            GROUP_HEADER="$(benchmark_header_from_suffix "${BENCHMARK_SUFFIX}")"
+            TITLE="$(image_title_from_png "${PNG_FILE_NAME}")"
+            SAFE_GROUP_HEADER="$(printf '%s' "${GROUP_HEADER}" | html_escape)"
+            SAFE_TITLE="$(printf '%s' "${TITLE}" | html_escape)"
+            SAFE_FILE_NAME="$(printf '%s' "${PNG_FILE_NAME}" | html_escape)"
 
-                printf '      <article class="card">\n'
-                printf '        <h2 class="title">%s</h2>\n' "${SAFE_TITLE}"
-                printf '        <a href="%s"><img src="%s" alt="%s"></a>\n' "${SAFE_FILE_NAME}" "${SAFE_FILE_NAME}" "${SAFE_TITLE}"
-                printf '      </article>\n'
-        done < <(find "${MONITOR_OUTPUT_DIR}" -maxdepth 1 -type f -name '*.png' -print0 | sort -z)
+            if [[ "${BENCHMARK_SUFFIX}" != "${CURRENT_SUFFIX}" ]]; then
+                if [[ -n "${CURRENT_SUFFIX}" ]]; then
+                    printf '        </div>\n'
+                    printf '      </section>\n'
+                fi
+
+                printf '      <section class="group">\n'
+                printf '        <header class="group-header">\n'
+                printf '          <h2 class="group-title">%s</h2>\n' "${SAFE_GROUP_HEADER}"
+                printf '        </header>\n'
+                printf '        <div class="image-list">\n'
+                CURRENT_SUFFIX="${BENCHMARK_SUFFIX}"
+            fi
+
+            printf '          <article class="card">\n'
+            printf '            <h3 class="title">%s</h3>\n' "${SAFE_TITLE}"
+            printf '            <a href="%s"><img src="%s" alt="%s"></a>\n' "${SAFE_FILE_NAME}" "${SAFE_FILE_NAME}" "${SAFE_TITLE}"
+            printf '          </article>\n'
+        done < <(
+            find "${MONITOR_OUTPUT_DIR}" -maxdepth 1 -type f -name '*.png' -printf '%f\n' |
+                while IFS= read -r PNG_FILE_NAME; do
+                    printf '%s\t%s\n' "$(benchmark_suffix_from_png "${PNG_FILE_NAME}")" "${PNG_FILE_NAME}"
+                done |
+                sort
+        )
+
+        if [[ -n "${CURRENT_SUFFIX}" ]]; then
+            printf '        </div>\n'
+            printf '      </section>\n'
+        fi
 
         cat <<'HTML_TAIL'
         </section>
