@@ -18,9 +18,8 @@ set ylabel "CPU%"
 set y2label "MemAvailable MB"
 set y2tics
 
-# Show full MemAvailable MB range from the data.
-set autoscale y2
-set y2range [*:*]
+# Fix MemAvailable MB to the requested range.
+set y2range [50:100]
 
 # Fix CPU to percent scale.
 set yrange [0:100]
