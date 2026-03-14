@@ -10,7 +10,7 @@ set datafile separator "\t"
 set title exists("title") ? title : "Latency Histogram"
 set xlabel "Latency (ms)"
 set ylabel "Requests"
-max_latency = 150.0
+max_latency = 30.0
 set xrange [0:max_latency]
 set grid
 set key off
