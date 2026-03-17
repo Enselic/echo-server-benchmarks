@@ -24,9 +24,7 @@ cp "$SCRIPT_DIR/test-client/target/release/tcp-echo-server-test-client" "$SCRIPT
 PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
-LATENCY_TSV_FILES=()
-LATENCY_PNG_FILES=()
-LATENCY_TITLES=()
+LATENCY_PLOTS=()
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
@@ -43,9 +41,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # We want all plots to have the same axis ranges for easy
             # comparision, so we need to collect all latency data before
             # rendering any plots. Store the file paths for later processing.
-            LATENCY_TSV_FILES+=("${LATENCY_TSV}")
-            LATENCY_PNG_FILES+=("${LATENCY_PNG}")
-            LATENCY_TITLES+=("${SERVER_NAME} latency histogram (10ms buckets)")
+            LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets)")
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
@@ -90,8 +86,11 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     done
 done
 
-if ((${#LATENCY_TSV_FILES[@]} > 0)); then
-    OBSERVED_MAX_LATENCY=$(awk '
+if ((${#LATENCY_PLOTS[@]} > 0)); then
+    OBSERVED_MAX_LATENCY=$(for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
+        IFS=':' read -r LATENCY_TSV _ _ <<<"$LATENCY_PLOT"
+        cat "${LATENCY_TSV}"
+    done | awk '
         BEGIN { max = 0; found = 0 }
         NF {
             value = $1 + 0
@@ -111,13 +110,14 @@ if ((${#LATENCY_TSV_FILES[@]} > 0)); then
                 print int(max)
             }
         }
-    ' "${LATENCY_TSV_FILES[@]}")
+    ')
 
-    for index in "${!LATENCY_TSV_FILES[@]}"; do
+    for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
+        IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE <<<"$LATENCY_PLOT"
         gnuplot \
-            -e "datafile='${LATENCY_TSV_FILES[$index]}'" \
-            -e "outputfile='${LATENCY_PNG_FILES[$index]}'" \
-            -e "title='${LATENCY_TITLES[$index]}'" \
+            -e "datafile='${LATENCY_TSV}'" \
+            -e "outputfile='${LATENCY_PNG}'" \
+            -e "title='${LATENCY_TITLE}'" \
             -e "max_latency=${OBSERVED_MAX_LATENCY}" \
             "${SCRIPT_DIR}/presentation/latency-histogram.gnuplot"
     done
