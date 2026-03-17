@@ -25,6 +25,7 @@ PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
 LATENCY_PLOTS=()
+OBSERVED_MAX_LATENCY=1
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
@@ -66,6 +67,13 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                     --latency-ms-file "${LATENCY_TSV}"
             )
 
+            # Keep a rolling max so all histograms can share a global x-axis.
+            RUN_MAX_LATENCY=$(sort -n "${LATENCY_TSV}" | tail -n 1 | cut -d. -f1)
+
+            if ((RUN_MAX_LATENCY > OBSERVED_MAX_LATENCY)); then
+                OBSERVED_MAX_LATENCY=${RUN_MAX_LATENCY}
+            fi
+
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
@@ -87,31 +95,6 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 done
 
 if ((${#LATENCY_PLOTS[@]} > 0)); then
-    OBSERVED_MAX_LATENCY=$(for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
-        IFS=':' read -r LATENCY_TSV _ _ <<<"$LATENCY_PLOT"
-        cat "${LATENCY_TSV}"
-    done | awk '
-        BEGIN { max = 0; found = 0 }
-        NF {
-            value = $1 + 0
-            if (!found || value > max) {
-                max = value
-                found = 1
-            }
-        }
-        END {
-            if (!found) {
-                print "1"
-                exit
-            }
-            if (max > int(max)) {
-                print int(max) + 1
-            } else {
-                print int(max)
-            }
-        }
-    ')
-
     for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
         IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE <<<"$LATENCY_PLOT"
         gnuplot \
