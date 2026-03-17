@@ -24,31 +24,35 @@ cp "$SCRIPT_DIR/test-client/target/release/tcp-echo-server-test-client" "$SCRIPT
 PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
-LATENCY_MS_FILES=()
+LATENCY_TSV_FILES=()
 LATENCY_PNG_FILES=()
 LATENCY_TITLES=()
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
         IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<<"$REQUEST_PAYLOAD_PAIR"
-
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
-            BENCHMARK_SUFFIX="pc${PARALLEL_CLIENTS}-rpc${REQUESTS_PER_CLIENT}-prc${PAYLOAD_REPEAT_COUNT}"
-            TSV_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.tsv"
-            PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.png"
-            LATENCY_MS_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.latency-ms.tsv"
-            LATENCY_PNG_FILE="${MONITOR_OUTPUT_DIR}/${SERVER_NAME}.${BENCHMARK_SUFFIX}.latency-hist.png"
-            LATENCY_MS_FILES+=("${LATENCY_MS_FILE}")
-            LATENCY_PNG_FILES+=("${LATENCY_PNG_FILE}")
+            BENCHMARK_ID="${SERVER_NAME}_parallel-clients-${PARALLEL_CLIENTS}_requests-per-client-${REQUESTS_PER_CLIENT}_payload-repeat-count-${PAYLOAD_REPEAT_COUNT}"
+            BENCHMARK_PATH_PREFIX="${MONITOR_OUTPUT_DIR}/${BENCHMARK_ID}"
+            SYSTEM_MONITOR_TSV="${BENCHMARK_PATH_PREFIX}_system-monitor.tsv"
+            SYSTEM_MONITOR_PNG="${BENCHMARK_PATH_PREFIX}_system-monitor.png"
+            LATENCY_TSV="${BENCHMARK_PATH_PREFIX}_latency.tsv"
+            LATENCY_PNG="${BENCHMARK_PATH_PREFIX}_latency.png"
+
+            # We want all plots to have the same axis ranges for easy
+            # comparision, so we need to collect all latency data before
+            # rendering any plots. Store the file paths for later processing.
+            LATENCY_TSV_FILES+=("${LATENCY_TSV}")
+            LATENCY_PNG_FILES+=("${LATENCY_PNG}")
             LATENCY_TITLES+=("${SERVER_NAME} latency histogram (10ms buckets)")
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" "--mem-available-baseline-kb" "6900000" > "${TSV_FILE}" &
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "~/bin/lightweight-system-monitor" "--mem-available-baseline-kb" "6900000" > "${SYSTEM_MONITOR_TSV}" &
             MONITOR_PID=$!
 
-            # Let system metrics stabalize before starting the server and client.
+            # Let system metrics stabilize before starting the server and client.
             sleep 0.1
 
             # Start the server on the remote host
@@ -63,13 +67,13 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
                     --parallel-clients ${PARALLEL_CLIENTS} \
                     --requests-per-client ${REQUESTS_PER_CLIENT} \
                     --payload-repeat-count ${PAYLOAD_REPEAT_COUNT} \
-                    --latency-ms-file "${LATENCY_MS_FILE}"
+                    --latency-ms-file "${LATENCY_TSV}"
             )
 
             # Stop the server
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
-            # Let system metrics stabalize before stopping monitoring.
+            # Let system metrics stabilize before stopping monitoring.
             sleep 0.1
 
             # Stop the monitor and flush captured output.
@@ -78,15 +82,15 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             # Render a PNG snapshot from the captured metrics.
             gnuplot \
-                -e "datafile='${TSV_FILE}'" \
-                -e "outputfile='${PNG_FILE}'" \
+                -e "datafile='${SYSTEM_MONITOR_TSV}'" \
+                -e "outputfile='${SYSTEM_MONITOR_PNG}'" \
                 "${SCRIPT_DIR}/presentation/visualize.gnuplot"
             trap - EXIT
         done
     done
 done
 
-if ((${#LATENCY_MS_FILES[@]} > 0)); then
+if ((${#LATENCY_TSV_FILES[@]} > 0)); then
     OBSERVED_MAX_LATENCY=$(awk '
         BEGIN { max = 0; found = 0 }
         NF {
@@ -107,11 +111,11 @@ if ((${#LATENCY_MS_FILES[@]} > 0)); then
                 print int(max)
             }
         }
-    ' "${LATENCY_MS_FILES[@]}")
+    ' "${LATENCY_TSV_FILES[@]}")
 
-    for index in "${!LATENCY_MS_FILES[@]}"; do
+    for index in "${!LATENCY_TSV_FILES[@]}"; do
         gnuplot \
-            -e "datafile='${LATENCY_MS_FILES[$index]}'" \
+            -e "datafile='${LATENCY_TSV_FILES[$index]}'" \
             -e "outputfile='${LATENCY_PNG_FILES[$index]}'" \
             -e "title='${LATENCY_TITLES[$index]}'" \
             -e "max_latency=${OBSERVED_MAX_LATENCY}" \
@@ -281,14 +285,14 @@ image_title_from_png() {
 HTML_HEAD
 
         CURRENT_SUFFIX=""
-        while IFS=$'\t' read -r BENCHMARK_SUFFIX PNG_FILE_NAME; do
-            GROUP_HEADER="$(benchmark_header_from_suffix "${BENCHMARK_SUFFIX}")"
+        while IFS=$'\t' read -r BENCHMARK_ID PNG_FILE_NAME; do
+            GROUP_HEADER="$(benchmark_header_from_suffix "${BENCHMARK_ID}")"
             TITLE="$(image_title_from_png "${PNG_FILE_NAME}")"
             SAFE_GROUP_HEADER="$(printf '%s' "${GROUP_HEADER}" | html_escape)"
             SAFE_TITLE="$(printf '%s' "${TITLE}" | html_escape)"
             SAFE_FILE_NAME="$(printf '%s' "${PNG_FILE_NAME}" | html_escape)"
 
-            if [[ "${BENCHMARK_SUFFIX}" != "${CURRENT_SUFFIX}" ]]; then
+            if [[ "${BENCHMARK_ID}" != "${CURRENT_SUFFIX}" ]]; then
                 if [[ -n "${CURRENT_SUFFIX}" ]]; then
                     printf '        </div>\n'
                     printf '      </section>\n'
@@ -299,7 +303,7 @@ HTML_HEAD
                 printf '          <h2 class="group-title">%s</h2>\n' "${SAFE_GROUP_HEADER}"
                 printf '        </header>\n'
                 printf '        <div class="image-list">\n'
-                CURRENT_SUFFIX="${BENCHMARK_SUFFIX}"
+                CURRENT_SUFFIX="${BENCHMARK_ID}"
             fi
 
             printf '          <article class="card">\n'
