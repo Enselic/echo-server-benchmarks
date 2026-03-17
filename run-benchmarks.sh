@@ -111,7 +111,7 @@ for SYSTEM_MONITOR_PLOT in "${SYSTEM_MONITOR_PLOTS[@]}"; do
         -e "outputfile='${SYSTEM_MONITOR_PNG}'" \
         -e "min_avail_kb=${OBSERVED_MIN_AVAIL_KB}" \
         -e "max_avail_kb=${OBSERVED_MAX_AVAIL_KB}" \
-        "${SCRIPT_DIR}/presentation/visualize.gnuplot"
+        "${SCRIPT_DIR}/presentation/system-monitor.gnuplot"
 done
 
 for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
