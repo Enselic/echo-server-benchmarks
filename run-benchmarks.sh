@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARALLEL_CLIENTS_VALUES="200"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="100:1"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="1000:1"
 
 REMOTE_PORT=9092
 RUN_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -49,7 +49,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             MONITOR_PID=$!
 
             # Let system metrics stabalize before starting the server and client.
-            sleep 5
+            sleep 0.1
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
@@ -70,7 +70,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Let system metrics stabalize before stopping monitoring.
-            sleep 5
+            sleep 0.1
 
             # Stop the monitor and flush captured output.
             kill "${MONITOR_PID}" 2>/dev/null || true
