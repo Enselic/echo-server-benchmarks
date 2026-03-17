@@ -11,7 +11,15 @@ set title exists("title") ? title : "Latency Histogram"
 set xlabel "Latency (ms)"
 set ylabel "Requests"
 set yrange [0:(exists("max_requests") ? max_requests : 1)]
-max_latency = 100.0
+if (!exists("max_latency")) {
+    max_latency = 100.0
+}
+if (max_latency > int(max_latency)) {
+    max_latency = int(max_latency) + 1.0
+}
+if (max_latency <= 0) {
+    max_latency = 1.0
+}
 # if (!exists("max_latency")) {
 #     stats datafile using 1 nooutput
 #     if (STATS_records > 0) {
