@@ -45,7 +45,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # We want all plots to have the same axis ranges for easy
             # comparision, so we need to collect all latency data before
             # rendering any plots. Store the file paths for later processing.
-            LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets)")
+            LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets):$((REQUESTS_PER_CLIENT * PARALLEL_CLIENTS))")
             SYSTEM_MONITOR_PLOTS+=("${SYSTEM_MONITOR_TSV}:${SYSTEM_MONITOR_PNG}")
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
@@ -115,11 +115,12 @@ for SYSTEM_MONITOR_PLOT in "${SYSTEM_MONITOR_PLOTS[@]}"; do
 done
 
 for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
-    IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE <<<"$LATENCY_PLOT"
+    IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE LATENCY_YMAX <<<"$LATENCY_PLOT"
     gnuplot \
         -e "datafile='${LATENCY_TSV}'" \
         -e "outputfile='${LATENCY_PNG}'" \
         -e "title='${LATENCY_TITLE}'" \
+        -e "max_requests=${LATENCY_YMAX}" \
         -e "max_latency=${OBSERVED_MAX_LATENCY}" \
         "${SCRIPT_DIR}/presentation/latency-histogram.gnuplot"
 done
