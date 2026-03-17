@@ -25,7 +25,10 @@ PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
 LATENCY_PLOTS=()
+SYSTEM_MONITOR_PLOTS=()
 OBSERVED_MAX_LATENCY=1
+OBSERVED_MIN_AVAIL_KB=999999999999
+OBSERVED_MAX_AVAIL_KB=0
 
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
@@ -43,6 +46,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # comparision, so we need to collect all latency data before
             # rendering any plots. Store the file paths for later processing.
             LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets)")
+            SYSTEM_MONITOR_PLOTS+=("${SYSTEM_MONITOR_TSV}:${SYSTEM_MONITOR_PNG}")
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
@@ -84,27 +88,41 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             kill "${MONITOR_PID}" 2>/dev/null || true
             wait "${MONITOR_PID}" 2>/dev/null || true
 
-            # Render a PNG snapshot from the captured metrics.
-            gnuplot \
-                -e "datafile='${SYSTEM_MONITOR_TSV}'" \
-                -e "outputfile='${SYSTEM_MONITOR_PNG}'" \
-                "${SCRIPT_DIR}/presentation/visualize.gnuplot"
+            RUN_MIN_AVAIL_KB=$(tail -n +2 "${SYSTEM_MONITOR_TSV}" | cut -f3 | sort -n | head -n 1)
+            RUN_MAX_AVAIL_KB=$(tail -n +2 "${SYSTEM_MONITOR_TSV}" | cut -f3 | sort -n | tail -n 1)
+
+            if ((RUN_MIN_AVAIL_KB < OBSERVED_MIN_AVAIL_KB)); then
+                OBSERVED_MIN_AVAIL_KB=${RUN_MIN_AVAIL_KB}
+            fi
+
+            if ((RUN_MAX_AVAIL_KB > OBSERVED_MAX_AVAIL_KB)); then
+                OBSERVED_MAX_AVAIL_KB=${RUN_MAX_AVAIL_KB}
+            fi
+
             trap - EXIT
         done
     done
 done
 
-if ((${#LATENCY_PLOTS[@]} > 0)); then
-    for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
-        IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE <<<"$LATENCY_PLOT"
-        gnuplot \
-            -e "datafile='${LATENCY_TSV}'" \
-            -e "outputfile='${LATENCY_PNG}'" \
-            -e "title='${LATENCY_TITLE}'" \
-            -e "max_latency=${OBSERVED_MAX_LATENCY}" \
-            "${SCRIPT_DIR}/presentation/latency-histogram.gnuplot"
-    done
-fi
+for SYSTEM_MONITOR_PLOT in "${SYSTEM_MONITOR_PLOTS[@]}"; do
+    IFS=':' read -r SYSTEM_MONITOR_TSV SYSTEM_MONITOR_PNG <<<"$SYSTEM_MONITOR_PLOT"
+    gnuplot \
+        -e "datafile='${SYSTEM_MONITOR_TSV}'" \
+        -e "outputfile='${SYSTEM_MONITOR_PNG}'" \
+        -e "min_avail_kb=${OBSERVED_MIN_AVAIL_KB}" \
+        -e "max_avail_kb=${OBSERVED_MAX_AVAIL_KB}" \
+        "${SCRIPT_DIR}/presentation/visualize.gnuplot"
+done
+
+for LATENCY_PLOT in "${LATENCY_PLOTS[@]}"; do
+    IFS=':' read -r LATENCY_TSV LATENCY_PNG LATENCY_TITLE <<<"$LATENCY_PLOT"
+    gnuplot \
+        -e "datafile='${LATENCY_TSV}'" \
+        -e "outputfile='${LATENCY_PNG}'" \
+        -e "title='${LATENCY_TITLE}'" \
+        -e "max_latency=${OBSERVED_MAX_LATENCY}" \
+        "${SCRIPT_DIR}/presentation/latency-histogram.gnuplot"
+done
 
 INDEX_HTML_FILE="${MONITOR_OUTPUT_DIR}/index.html"
 

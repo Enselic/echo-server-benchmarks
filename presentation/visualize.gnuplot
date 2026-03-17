@@ -19,7 +19,9 @@ set y2label "MemAvailable MB"
 set y2tics
 
 # Fix MemAvailable MB to the requested range.
-set y2range [50:100]
+if (!exists("min_avail_kb")) min_avail_kb = 50000
+if (!exists("max_avail_kb")) max_avail_kb = 100000
+set y2range [min_avail_kb/1000.0:max_avail_kb/1000.0]
 
 # Fix CPU to percent scale.
 set yrange [0:100]
