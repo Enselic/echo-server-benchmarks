@@ -1,14 +1,21 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
-./prepare-benchmarks.sh
+# ./prepare-benchmarks.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="60"
+PARALLEL_CLIENTS_VALUES="20"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="100000:1"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="10000:1 10000:10 10000:100 10000:1000 10000:10000"
+
+SERVERS=" \
+    go-echo-server \
+"
+#    rust-async-tokio-echo-server \
+#    rust-sync-echo-server \
+#    rust-async-smol-echo-server \
 
 REMOTE_PORT=9092
 RUN_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -18,9 +25,10 @@ MONITOR_OUTPUT_DIR="/tmp/echo-server-benchmarks-${RUN_TIMESTAMP}"
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
 # Build test client from source
-echo "Building echo-server-test-client..."
-(cd "$SCRIPT_DIR/test-client" && cargo build --release)
-cp "$SCRIPT_DIR/test-client/target/release/echo-server-test-client" "$SCRIPT_DIR/build/echo-server-test-client"
+# echo "Building echo-server-test-client..."
+# (cd "$SCRIPT_DIR/test-client" && cargo build --release)
+# cp "$SCRIPT_DIR/test-client/target/release/echo-server-test-client" "$SCRIPT_DIR/build/echo-server-test-client"
+
 PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
@@ -36,7 +44,7 @@ SLEEP_TIME=10
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
         IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<<"$REQUEST_PAYLOAD_PAIR"
-        for SERVER in "$SCRIPT_DIR"/servers/*-echo-server; do
+        for SERVER in ${SERVERS}; do
             SERVER_NAME=$(basename $SERVER)
             BENCHMARK_ID="parallel-clients-${PARALLEL_CLIENTS}_requests-per-client-${REQUESTS_PER_CLIENT}_payload-repeat-count-${PAYLOAD_REPEAT_COUNT}_${SERVER_NAME}"
             BENCHMARK_PATH_PREFIX="${MONITOR_OUTPUT_DIR}/${BENCHMARK_ID}"
