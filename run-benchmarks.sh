@@ -29,6 +29,7 @@ SYSTEM_MONITOR_PLOTS=()
 OBSERVED_MAX_LATENCY=1
 OBSERVED_MIN_AVAIL_KB=999999999999
 OBSERVED_MAX_AVAIL_KB=0
+OBSERVED_MAX_SECONDS=1
 
 SLEEP_TIME=0.1
 
@@ -91,6 +92,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             RUN_MIN_AVAIL_KB=$(tail -n +2 "${SYSTEM_MONITOR_TSV}" | cut -f3 | sort -n | head -n 1)
             RUN_MAX_AVAIL_KB=$(tail -n +2 "${SYSTEM_MONITOR_TSV}" | cut -f3 | sort -n | tail -n 1)
+            RUN_MAX_SECONDS=$(tail -n +2 "${SYSTEM_MONITOR_TSV}" | cut -f1 | sort -n | tail -n 1 | cut -d. -f1)
 
             if ((RUN_MIN_AVAIL_KB < OBSERVED_MIN_AVAIL_KB)); then
                 OBSERVED_MIN_AVAIL_KB=${RUN_MIN_AVAIL_KB}
@@ -98,6 +100,10 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             if ((RUN_MAX_AVAIL_KB > OBSERVED_MAX_AVAIL_KB)); then
                 OBSERVED_MAX_AVAIL_KB=${RUN_MAX_AVAIL_KB}
+            fi
+
+            if ((RUN_MAX_SECONDS > OBSERVED_MAX_SECONDS)); then
+                OBSERVED_MAX_SECONDS=${RUN_MAX_SECONDS}
             fi
 
             trap - EXIT
@@ -112,6 +118,7 @@ for SYSTEM_MONITOR_PLOT in "${SYSTEM_MONITOR_PLOTS[@]}"; do
         -e "outputfile='${SYSTEM_MONITOR_PNG}'" \
         -e "min_avail_kb=${OBSERVED_MIN_AVAIL_KB}" \
         -e "max_avail_kb=${OBSERVED_MAX_AVAIL_KB}" \
+        -e "max_seconds=${OBSERVED_MAX_SECONDS}" \
         "${SCRIPT_DIR}/presentation/system-monitor.gnuplot"
 done
 

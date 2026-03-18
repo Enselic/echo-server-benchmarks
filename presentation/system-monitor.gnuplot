@@ -10,6 +10,10 @@ set decimalsign ","
 set title "CPU% and MemAvailable MB"
 set xlabel "seconds"
 
+# Keep all system-monitor plots on a shared x-axis range.
+if (!exists("max_seconds")) max_seconds = 1
+set xrange [0:max_seconds]
+
 set grid
 set key top center horizontal
 set tics nomirror
@@ -25,6 +29,8 @@ set y2range [min_avail_kb/1000.0:max_avail_kb/1000.0]
 
 # Fix CPU to percent scale.
 set yrange [0:100]
+
+
 
 # datafile must be passed via -e "datafile='...'"
 plot datafile using 1:2 with lines lw 2 title "CPU%", \
