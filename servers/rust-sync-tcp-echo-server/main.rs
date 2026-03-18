@@ -4,7 +4,7 @@ use std::thread;
 
 fn main() -> std::io::Result<()> {
     let port = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("usage: rust-threads-tcp-echo-server <port>");
+        eprintln!("usage: rust-threads-echo-server <port>");
         std::process::exit(2);
     });
 

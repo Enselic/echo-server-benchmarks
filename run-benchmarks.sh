@@ -18,9 +18,9 @@ MONITOR_OUTPUT_DIR="/tmp/echo-server-benchmarks-${RUN_TIMESTAMP}"
 ulimit -n $(cat /proc/sys/fs/nr_open)
 
 # Build test client from source
-echo "Building tcp-echo-server-test-client..."
+echo "Building echo-server-test-client..."
 (cd "$SCRIPT_DIR/test-client" && cargo build --release)
-cp "$SCRIPT_DIR/test-client/target/release/tcp-echo-server-test-client" "$SCRIPT_DIR/build/tcp-echo-server-test-client"
+cp "$SCRIPT_DIR/test-client/target/release/echo-server-test-client" "$SCRIPT_DIR/build/echo-server-test-client"
 PATH="$SCRIPT_DIR/build:$PATH"
 mkdir -p "${MONITOR_OUTPUT_DIR}"
 
@@ -36,7 +36,7 @@ SLEEP_TIME=10
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
         IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<<"$REQUEST_PAYLOAD_PAIR"
-        for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
+        for SERVER in "$SCRIPT_DIR"/servers/*-echo-server; do
             SERVER_NAME=$(basename $SERVER)
             BENCHMARK_ID="parallel-clients-${PARALLEL_CLIENTS}_requests-per-client-${REQUESTS_PER_CLIENT}_payload-repeat-count-${PAYLOAD_REPEAT_COUNT}_${SERVER_NAME}"
             BENCHMARK_PATH_PREFIX="${MONITOR_OUTPUT_DIR}/${BENCHMARK_ID}"
@@ -66,7 +66,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
             echo "Running benchmark: ${BENCHMARK_ID}..."
-            tcp-echo-server-test-client \
+            echo-server-test-client \
                 --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
                 --requests-per-client ${REQUESTS_PER_CLIENT} \

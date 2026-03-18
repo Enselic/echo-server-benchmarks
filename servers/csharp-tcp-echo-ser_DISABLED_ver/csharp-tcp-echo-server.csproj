@@ -4,6 +4,6 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AssemblyName>csharp-tcp-echo-server</AssemblyName>
+    <AssemblyName>csharp-echo-server</AssemblyName>
   </PropertyGroup>
 </Project>

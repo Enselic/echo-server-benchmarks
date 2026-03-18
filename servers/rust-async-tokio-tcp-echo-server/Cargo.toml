@@ -1,5 +1,5 @@
 [package]
-name = "rust-tokio-tcp-echo-server"
+name = "rust-tokio-echo-server"
 version = "0.1.0"
 edition = "2024"
 

@@ -1,5 +1,5 @@
 [package]
-name = "tcp-echo-server-test-client"
+name = "echo-server-test-client"
 version = "0.1.0"
 edition = "2021"
 

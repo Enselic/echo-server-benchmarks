@@ -6,7 +6,7 @@ BUILD_DIR="./build"
 DEPLOY_DIR="/home/$REMOTE_USER/bin"
 
 # First build and deploy all servers
-for SERVER in ./servers/*-tcp-echo-server; do
+for SERVER in ./servers/*-echo-server; do
     SERVER_NAME=$(basename $SERVER)
 
     echo "Building and deploying $SERVER_NAME..."

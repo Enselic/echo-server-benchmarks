@@ -5,7 +5,7 @@ import java.net.Socket;
 public final class Main {
     public static void main(String[] args) throws IOException {
         if (args.length != 1) {
-            System.err.println("usage: java-tcp-echo-server <port>");
+            System.err.println("usage: java-echo-server <port>");
             System.exit(2);
         }
 

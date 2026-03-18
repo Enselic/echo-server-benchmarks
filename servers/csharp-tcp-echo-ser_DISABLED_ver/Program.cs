@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 if (args.Length != 1 || !int.TryParse(args[0], out var port) || port < 1 || port > 65535)
 {
-    Console.Error.WriteLine("usage: csharp-tcp-echo-server <port>");
+    Console.Error.WriteLine("usage: csharp-echo-server <port>");
     Environment.Exit(2);
 }
 

@@ -6,4 +6,4 @@ OUTPUT_PATH="$(pwd)/$1"
 
 cd "$SCRIPT_DIR"
 cargo build --release
-cp "$SCRIPT_DIR/target/release/rust-tokio-tcp-echo-server" "$OUTPUT_PATH"
+cp "$SCRIPT_DIR/target/release/rust-tokio-echo-server" "$OUTPUT_PATH"

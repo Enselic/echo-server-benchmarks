@@ -7,7 +7,7 @@ fn main() -> std::io::Result<()> {
 
 async fn async_main() -> std::io::Result<()> {
     let port = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("usage: rust-tcp-echo-server <port>");
+        eprintln!("usage: rust-echo-server <port>");
         std::process::exit(2);
     });
 

@@ -291,7 +291,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-smol-tcp-echo-server"
+name = "rust-smol-echo-server"
 version = "0.1.0"
 dependencies = [
  "async-net",

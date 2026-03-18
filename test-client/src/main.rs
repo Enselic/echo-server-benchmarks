@@ -8,7 +8,7 @@ use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout, Instant};
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "tcp-echo-server-test-client")]
+#[command(name = "echo-server-test-client")]
 struct CliArgs {
     #[arg(short = 'a', long = "addr", default_value = "localhost:80")]
     addr: String,
