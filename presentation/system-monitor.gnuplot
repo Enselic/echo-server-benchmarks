@@ -8,7 +8,7 @@ set datafile separator "\t"
 set decimalsign ","
 
 set title "CPU% and MemAvailable MB"
-set xlabel "ms"
+set xlabel "seconds"
 
 set grid
 set key top center horizontal
