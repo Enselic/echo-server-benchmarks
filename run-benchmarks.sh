@@ -30,12 +30,14 @@ OBSERVED_MAX_LATENCY=1
 OBSERVED_MIN_AVAIL_KB=999999999999
 OBSERVED_MAX_AVAIL_KB=0
 
+SLEEP_TIME=0.1
+
 for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
     for REQUEST_PAYLOAD_PAIR in $REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS; do
         IFS=':' read -r REQUESTS_PER_CLIENT PAYLOAD_REPEAT_COUNT <<<"$REQUEST_PAYLOAD_PAIR"
         for SERVER in "$SCRIPT_DIR"/servers/*-tcp-echo-server; do
             SERVER_NAME=$(basename $SERVER)
-            BENCHMARK_ID="${SERVER_NAME}_parallel-clients-${PARALLEL_CLIENTS}_requests-per-client-${REQUESTS_PER_CLIENT}_payload-repeat-count-${PAYLOAD_REPEAT_COUNT}"
+            BENCHMARK_ID="parallel-clients-${PARALLEL_CLIENTS}_requests-per-client-${REQUESTS_PER_CLIENT}_payload-repeat-count-${PAYLOAD_REPEAT_COUNT}_${SERVER_NAME}"
             BENCHMARK_PATH_PREFIX="${MONITOR_OUTPUT_DIR}/${BENCHMARK_ID}"
             SYSTEM_MONITOR_TSV="${BENCHMARK_PATH_PREFIX}_system-monitor.tsv"
             SYSTEM_MONITOR_PNG="${BENCHMARK_PATH_PREFIX}_system-monitor.png"
@@ -47,6 +49,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # rendering any plots. Store the file paths for later processing.
             LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets):$((REQUESTS_PER_CLIENT * PARALLEL_CLIENTS))")
             SYSTEM_MONITOR_PLOTS+=("${SYSTEM_MONITOR_TSV}:${SYSTEM_MONITOR_PNG}")
+
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Collect remote system metrics during this benchmark run.
@@ -54,7 +57,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             MONITOR_PID=$!
 
             # Let system metrics stabilize before starting the server and client.
-            sleep 0.1
+            sleep ${SLEEP_TIME}
 
             # Start the server on the remote host
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "/home/martin/bin/${SERVER_NAME} ${REMOTE_PORT}" &
@@ -82,7 +85,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Let system metrics stabilize before stopping monitoring.
-            sleep 0.1
+            sleep ${SLEEP_TIME}
 
             # Stop the monitor and flush captured output.
             kill "${MONITOR_PID}" 2>/dev/null || true
