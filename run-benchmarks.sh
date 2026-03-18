@@ -47,7 +47,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             # We want all plots to have the same axis ranges for easy
             # comparision, so we need to collect all latency data before
             # rendering any plots. Store the file paths for later processing.
-            LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram (10ms buckets):$((REQUESTS_PER_CLIENT * PARALLEL_CLIENTS))")
+            LATENCY_PLOTS+=("${LATENCY_TSV}:${LATENCY_PNG}:${SERVER_NAME} latency histogram:$((REQUESTS_PER_CLIENT * PARALLEL_CLIENTS))")
             SYSTEM_MONITOR_PLOTS+=("${SYSTEM_MONITOR_TSV}:${SYSTEM_MONITOR_PNG}")
 
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
@@ -64,15 +64,13 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
-            (
-                set -o xtrace
-                tcp-echo-server-test-client \
-                    --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
-                    --parallel-clients ${PARALLEL_CLIENTS} \
-                    --requests-per-client ${REQUESTS_PER_CLIENT} \
-                    --payload-repeat-count ${PAYLOAD_REPEAT_COUNT} \
-                    --latency-ms-file "${LATENCY_TSV}"
-            )
+            echo "Running benchmark: ${BENCHMARK_ID}..."
+            tcp-echo-server-test-client \
+                --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
+                --parallel-clients ${PARALLEL_CLIENTS} \
+                --requests-per-client ${REQUESTS_PER_CLIENT} \
+                --payload-repeat-count ${PAYLOAD_REPEAT_COUNT} \
+                --latency-ms-file "${LATENCY_TSV}"
 
             # Keep a rolling max so all histograms can share a global x-axis.
             RUN_MAX_LATENCY=$(sort -n "${LATENCY_TSV}" | tail -n 1 | cut -d. -f1)
