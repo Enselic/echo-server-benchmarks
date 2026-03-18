@@ -9,11 +9,11 @@ PARALLEL_CLIENTS_VALUES="20"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
 REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS=" \
-    10000:1 \
-    10000:10 \
-    10000:100 \
+    1000000:1 \
+    1000000:10 \
+    100000:100 \
     10000:1000 \
-    10000:10000 \
+    1000:10000 \
 "
 
 SERVERS=" \
