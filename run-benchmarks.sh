@@ -5,7 +5,7 @@ set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="40"
+PARALLEL_CLIENTS_VALUES="60"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
 REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="100000:1"
@@ -65,7 +65,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
 
             trap 'ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true' EXIT
 
-            echo "Running benchmark: ${BENCHMARK_ID}..."
+            echo "Running: Parallel Clients ${PARALLEL_CLIENTS}, Requests per Client ${REQUESTS_PER_CLIENT}, Payload Repeat Count ${PAYLOAD_REPEAT_COUNT}, Server ${SERVER_NAME}..."
             echo-server-test-client \
                 --addr "${REMOTE_HOST}:${REMOTE_PORT}" \
                 --parallel-clients ${PARALLEL_CLIENTS} \
