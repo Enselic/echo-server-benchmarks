@@ -5,21 +5,23 @@ set -o errexit -o nounset -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-PARALLEL_CLIENTS_VALUES="20"
+PARALLEL_CLIENTS_VALUES=" \
+    10 \
+    20 \
+    30 \
+    40 \
+    50 \
+"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
 REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS=" \
-    1000000:1 \
-    1000000:10 \
-    100000:100 \
-    10000:1000 \
-    1000:10000 \
+    10000:1 \
 "
 
 SERVERS=" \
     go-echo-server \
+    rust-async-tokio-echo-server \
 "
-#    rust-async-tokio-echo-server \
 #    rust-sync-echo-server \
 #    rust-async-smol-echo-server \
 
