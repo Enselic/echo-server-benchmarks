@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -o errexit -o nounset -o pipefail
 
-# First run ./prepare-benchmarks.sh
+./prepare-benchmarks.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 PARALLEL_CLIENTS_VALUES="20"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="100000:1"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="10000:1"
 
 REMOTE_PORT=9092
 RUN_TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
@@ -336,10 +336,8 @@ HTML_TAIL
 
 echo "All benchmarks completed successfully! See
 
-    file://wsl.localhost/Ubuntu-24.04/$MONITOR_OUTPUT_DIR
-
-or
-
-    winopen $MONITOR_OUTPUT_DIR
+    $MONITOR_OUTPUT_DIR
 
 for results."
+
+/mnt/c/Program\ Files/Google/Chrome/Application/chrome.exe file://wsl.localhost/Ubuntu-24.04$MONITOR_OUTPUT_DIR
