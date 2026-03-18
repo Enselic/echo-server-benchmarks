@@ -11,7 +11,10 @@ set title "CPU% and MemAvailable MB"
 set xlabel "seconds"
 
 # Keep all system-monitor plots on a shared x-axis range.
-if (!exists("max_seconds")) max_seconds = 1
+if (!exists("max_seconds")) {
+     print "Error: max_seconds must be provided via -e \"max_seconds=<value>\""
+     exit 1
+}
 set xrange [0:max_seconds]
 
 set grid
