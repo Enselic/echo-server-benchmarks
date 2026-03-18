@@ -8,7 +8,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARALLEL_CLIENTS_VALUES="20"
 
 # Format per entry: <requests-per-client>:<payload-repeat-count>
-REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS="10000:1 10000:10 10000:100 10000:1000 10000:10000"
+REQUESTS_PER_CLIENT_AND_PAYLOAD_REPEAT_COUNT_PAIRS=" \
+    10000:1 \
+    10000:10 \
+    10000:100 \
+    10000:1000 \
+    10000:10000 \
+"
 
 SERVERS=" \
     go-echo-server \
@@ -66,6 +72,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             MONITOR_PID=$!
 
             # Let system metrics stabilize before starting the server and client.
+            echo "Pre-run cooldown sleep ${SLEEP_TIME} seconds..."
             sleep ${SLEEP_TIME}
 
             # Start the server on the remote host
@@ -92,6 +99,7 @@ for PARALLEL_CLIENTS in $PARALLEL_CLIENTS_VALUES; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "pkill --full ${SERVER_NAME}" 2>/dev/null || true
 
             # Let system metrics stabilize before stopping monitoring.
+            echo "Post-run cooldown sleep ${SLEEP_TIME} seconds..."
             sleep ${SLEEP_TIME}
 
             # Stop the monitor and flush captured output.
